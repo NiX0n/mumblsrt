@@ -1,0 +1,17 @@
+{
+	"name": "mumbl",
+	"version": "1.0.0",
+	"description": "Subtitle Generation Using Whisper AI + Stutter Detection",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [
+		"whisper"
+	],
+	"author": "Null Character",
+	"license": "ISC",
+	"dependencies": {
+		"bluebird": "*"
+	}
+}
