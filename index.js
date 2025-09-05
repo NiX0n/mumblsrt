@@ -1,4 +1,8 @@
 'use strict';
+
+const { default: Transcription } = require('./sql/model/transcription');
+const { default: TranscriptionAttempt } = require('./sql/model/transcription-attempt');
+
 const 
     {log, error} = console,
     {execSync, spawn} = require('node:child_process'),
@@ -122,12 +126,73 @@ function initDb(db)
     });
 }
 
-insertTranscriptionAttempt()
+/**
+ * 
+ * @param {TranscriptionAttempt} attempt 
+ */
+function insertAttempt(attempt)
 {
-
-
+    log("INSERTING attempt");
+    const 
+        sql = fs.readFileSync('./sql/INSERT_INTO_transcription_attempt.sql', enc),
+        stmt = db.prepare(sql),
+        result = stmt.run(attempt)
+    ;
+    attempt.id = result.lastInsertRowid;
+    log("INSERTED attempt:", result);
 }
 
-initDb(db)
+
+/**
+ * 
+ * @param {Array<Transcription>} transcription 
+ */
+function insertTranscriptions(transcriptions)
+{
+    log("INSERTING transcriptions");
+    const 
+        sql = fs.readFileSync('./sql/INSERT_INTO_transcription.sql', enc),
+        stmt = db.prepare(sql)
+    ;
+
+    transcriptions.forEach(transcription => {
+        //log("INSERTING transcription: ", transcription);
+        const result = stmt.run(transcription);
+        transcription.id = result.lastInsertRowid;
+        log("INSERTED transcription:", result);
+    });
+    log("INSERTED transcriptions:", result);
+}
+
+initDb(db);
+
+/**
+ * @type {TranscriptionAttempt}
+ */
+const attempt = {
+    parentId: null,
+    file: inFile,
+    startTime: null,
+    endTime: null
+};
+
+insertAttempt(attempt);
+
+const 
+    data = JSON.parse(fs.readFileSync(`${wd}/attempt_${attempt.id}.json`, enc)),
+    /**
+     * @type {Transcription}
+     */
+    transcriptins = data.transcription.map(t => { return { 
+        attemptId: attempt.id,
+        fromOffset: t.offsets.from,
+        toOffset: t.offsets.to,
+        text: t.text,
+        tokens: JSON.stringify(t.tokens)
+     }})
+;
+insertTranscriptions(transcriptins);
+
+
 
 //attemptTrancription(inFile);
