@@ -1,5 +1,5 @@
 {
-	"name": "mumbl",
+	"name": "mumblsrt",
 	"version": "1.0.0",
 	"description": "Subtitle Generation Using Whisper AI + Stutter Detection",
 	"main": "index.js",
@@ -12,6 +12,7 @@
 	"author": "Null Character",
 	"license": "ISC",
 	"dependencies": {
-		"bluebird": "*"
+		"bluebird": "*",
+		"change-case": "*"
 	}
 }

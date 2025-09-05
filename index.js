@@ -1,8 +1,5 @@
 'use strict';
-
-const { default: Transcription } = require('./sql/model/transcription');
-const { default: TranscriptionAttempt } = require('./sql/model/transcription-attempt');
-
+//const { default: Transcription } = require('./sql/model/transcription');
 const 
     {log, error} = console,
     {execSync, spawn} = require('node:child_process'),
@@ -14,7 +11,8 @@ const
         //':memory:' || 
         `${wd}/db.sqlite3`,
     db = new DatabaseSync(dbPath),
-    inFile = process.argv[process.argv.length - 1]
+    inFile = process.argv[process.argv.length - 1],
+    { camelCase, snakeCase } = require('change-case/keys')
 ;
 
 /**
@@ -164,20 +162,44 @@ function insertTranscriptions(transcriptions)
     log("INSERTED transcriptions:", result);
 }
 
-initDb(db);
-
 /**
- * @type {TranscriptionAttempt}
+ * 
+ * @param {TranscriptionAttempt} attemptConds
+ * @returns TranscriptionAttempt
  */
-const attempt = {
+function fetchAttempt(attemptConds)
+{
+    const 
+        {sql, parameters} = require('./sql/SELECT_FROM_traanscripion_attempt.sql')(attemptConds),
+        stmt = db.prepare(sql)
+    ;
+    log(sql, parameters);
+    return camelCase(stmt.get(parameters));
+}
+
+let attempt = fetchAttempt({
     parentId: null,
-    file: inFile,
-    startTime: null,
-    endTime: null
-};
+    file: inFile
+});
 
-insertAttempt(attempt);
 
+log(attempt);
+
+if(!attempt)
+{
+    attempt = {
+        parentId: null,
+        file: inFile,
+        startTime: null,
+        endTime: null
+    };
+
+    insertAttempt(attempt);
+    // refresh with full object for consistency
+    attempt = fetchAttempt({id: attempt.id})
+}
+
+return;
 const 
     data = JSON.parse(fs.readFileSync(`${wd}/attempt_${attempt.id}.json`, enc)),
     /**

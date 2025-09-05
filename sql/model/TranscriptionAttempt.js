@@ -1,4 +1,4 @@
-export default class TranscriptionAttempt 
+module.exports = class TranscriptionAttempt 
 {
     id;
     parentId;
