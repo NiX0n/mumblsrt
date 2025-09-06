@@ -146,21 +146,34 @@ function insertAttempt(attempt)
 /**
  * 
  * @param {Array<Transcription>} transcription 
+ * @returns {Array<Transcription>}
  */
 function insertTranscriptions(transcriptions)
 {
     log("INSERTING transcriptions");
     const 
         sql = fs.readFileSync('./sql/INSERT_INTO_transcription.sql', enc),
-        stmt = db.prepare(sql)
+        stmt = db.prepare(sql),
+        inserted = []
     ;
 
     transcriptions.forEach(transcription => {
         //log("INSERTING transcription: ", transcription);
         const row = stmt.get(transcription);
-        transcription.assign(row, true);
+        if(!row) { return; }
+        if(transcription instanceof Transcription)
+        {
+            transcription.assign(row, true);
+            inserted.push(transcription);
+        }
+        else
+        {
+            inserted.push(new Transcription(row, true));
+        }
+        
         log("INSERTED transcription:", row);
     });
+    return inserted;
 }
 
 /**
