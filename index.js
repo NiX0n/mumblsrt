@@ -174,7 +174,7 @@ function fetchAttempt(attemptConds)
         {sql, parameters} = require('./sql/SELECT_FROM_traanscripion_attempt.sql')(attemptConds),
         stmt = db.prepare(sql)
     ;
-    log(sql, parameters);
+    //log(sql, parameters);
     const row = stmt.get(parameters);
     return row && new TranscriptionAttempt(row);
 }
@@ -186,19 +186,19 @@ let attempt = fetchAttempt({
 
 
 log(attempt);
-return;
+
 if(!attempt)
 {
-    attempt = {
+    attempt = new TranscriptionAttempt({
         parentId: null,
         file: inFile,
         startTime: null,
         endTime: null
-    };
+    }, true);
 
     insertAttempt(attempt);
     // refresh with full object for consistency
-    attempt = fetchAttempt({id: attempt.id})
+    //attempt = fetchAttempt({id: attempt.id})
 }
 
 return;
