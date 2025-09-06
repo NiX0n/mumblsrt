@@ -1,6 +1,7 @@
 'use strict';
 const 
     {log, error} = console,
+    Promise = require('bluebird'),
     {execSync, spawn} = require('node:child_process'),
     wd = './tmp' || fs.mkdtempSync(),
     fs = require('fs'),
@@ -48,23 +49,19 @@ function objToArgs(args)
 
 /**
  * 
- * @param {string} attemptFile 
- * @param {*} options 
+ * @param {TranscriptionAttempt} attempt 
+ * @param {object} options 
  */
-function transcribe(attempt, options)
+function transcribe(attempt, options = {})
 {
-    //MODEL=./models/ggml-tiny.en.bin
-    //#MODEL=./models/ggml-large-v3.bin
-    //#MODEL=./models/ggml-large-v3-turbo-q5_0.bin
-    //#MODEL=./models/ggml-medium.en.bin
+    return Promise((res, rej) => {
     const 
         model = './models/ggml-large-v3-turbo.bin',
         attemptFile = attemptJsonFilename(attempt),
         ffmpegArgs = {
-            // setting undefined, but specificly ordered
-            ss: undefined,
-            to: undefined,
-            i: inFile,
+            ss: Number.isInteger(attempt.startTime) ? attempt.startTime : undefined,
+            to: Number.isInteger(attempt.endTime) ? attempt.endTime : undefined,
+            i: attempt.file,
             f: 'wav',
             acodec: 'pcm_s16le',
             ac: 1,
@@ -82,7 +79,7 @@ function transcribe(attempt, options)
             // whisper-cli will re-append this extension
             of: attemptFile.replace(/\.json$/i, '')
         },
-        execOptions = {
+        spawnOptions = {
             cwd: '~/src/whisper.cpp'
         }
     ;
@@ -100,16 +97,21 @@ function transcribe(attempt, options)
     }
 
     const cmd = `ffmpeg${objToArgs(ffmpegArgs)} - | ./build/bin/whisper-cli${objToArgs(cliArgs)} -f -`;
-    log(cmd);
-    log(execSync(cmd, execOptions));
+    log('Spawning:', cmd);
+    
+    const child = spawn(cmd, spawnOptions);
 
-    /*execSync(`ffmpeg -i "${inFile}" -f wav -acodec pcm_s16le -ac 1 -ar 16000 - | \
-        ./build/bin/whisper-cli \
-            -t 20 -bo 7 -bs 7 \
-            -nf -nth 0.20 -ml 200 \
-            -m ${model}} \
-            -ojf -of "${attemptFile}" -f -
-    `, );*/
+    child.stdout.on('data', log);
+    child.stderr.on('data', error);
+
+    child.on('close', (code) => {
+        if(!code)
+        {
+            res(true);
+        }
+        rej(`ffmpeg/whisper-cli process exited with code ${code}`);
+    });
+    });// new Promise()
 }
 
 /**
@@ -180,7 +182,7 @@ function insertTranscriptions(transcriptions)
 
 /**
  * 
- * @param {TranscriptionAttempt} attemptConds
+ * @param {TranscriptionAttempt|object} attemptConds
  * @returns {TranscriptionAttempt|undefined}
  */
 function fetchAttempt(attemptConds)
@@ -209,7 +211,7 @@ function hasTranscriptions(attempt)
 
 /**
  * @param {TranscriptionAttempt} attempt 
- * @returns {Array<object>}
+ * @returns {Array<TranscriptionStutter>}
  */
 function fetchTranscriptionStutter(attempt)
 {
@@ -232,7 +234,7 @@ function attemptJsonFilename(attempt)
 /**
  * @param {TranscriptionAttempt} attempt 
  */
-function parseAndLoadJson(attempt)
+function parseAndInsertTranscriptionJson(attempt)
 {
     const 
         data = JSON.parse(fs.readFileSync(attemptJsonFilename(attempt), enc)),
@@ -275,7 +277,27 @@ if(!hasTranscriptions(attempt))
     {
         transcribe(attempt);
     }
-    parseAndLoadJson(attempt);
+    parseAndInsertTranscriptionJson(attempt);
 }
 
-log('Stuttering:', fetchTranscriptionStutter(attempt));
+const stutterings = fetchTranscriptionStutter(attempt);
+if(!stutterings?.length)
+{
+    log("No stuttering found");
+    return;
+}
+
+stutterings.forEach(stutter => {
+    let newAttempt = new TranscriptionAttempt({
+        startTime:  Math.floor(stutter.minFromOffset / 1000),
+        endTime: Math.ceil(stutter.maxToOffset / 1000),
+        parentId: attempt.id,
+        file: attempt.file
+    });
+
+    attempt = fetchAttempt(attempt) || attempt;
+    
+    log('Stuttering found:', stutter);
+    log('New attempt:', newAttempt);
+});
+
