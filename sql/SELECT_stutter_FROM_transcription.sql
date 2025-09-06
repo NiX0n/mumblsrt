@@ -1,17 +1,31 @@
+WITH flagged AS (
+    SELECT
+        *,
+        LAG(text) OVER (ORDER BY id) AS prev_text
+    FROM transcription
+    --TODO Add WHERE
+),
+grouped AS (
+    SELECT
+        *,
+        -- start a new group whenever status <> prev_status (or on the very first row)
+        SUM(CASE 
+            WHEN 
+                prev_text IS NULL 
+                OR text <> prev_text
+            THEN 1 
+            ELSE 0 
+        END) OVER (ORDER BY id) AS group_id
+    FROM flagged
+)
+SELECT * FROM grouped;
 SELECT
-
-FROM transcription
-
-
-SELECT
-    your_column,
-    MIN(order_column) AS start_of_chunk,
-    MAX(order_column) AS end_of_chunk,
-    COUNT(*) AS rows_in_chunk
-FROM (
-    SELECT your_column, order_column,
-    SUM(CASE WHEN your_column <> LAG(your_column, 1, your_column) OVER (ORDER BY order_column) THEN 1 ELSE 0 END) OVER (ORDER BY order_column) AS group_id
-    FROM your_table
-) AS grouped_data
-GROUP BY your_column, group_id
-ORDER BY start_of_chunk;
+    group_id,
+    text,
+    MIN(id) AS min_id,
+    MAX(id) AS max_id,
+    COUNT(*) AS count
+FROM grouped
+GROUP BY group_id
+HAVING COUNT(*) > 4
+ORDER BY group_id;

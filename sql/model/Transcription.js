@@ -1,4 +1,5 @@
-export default class Transcription
+'use strict';
+class TranscriptionBase
 {
     /**
      * @type {number}
@@ -8,7 +9,7 @@ export default class Transcription
     /**
      * @type {number}
      */
-    attempt_id;
+    attemptId;
 
     /**
      * @type {number}
@@ -20,3 +21,5 @@ export default class Transcription
     text;
     tokens;
 }
+
+module.exports = class Transcription extends require('./Mixin')(TranscriptionBase) {};

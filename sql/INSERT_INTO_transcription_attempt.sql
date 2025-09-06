@@ -10,3 +10,5 @@ VALUES (
     :startTime,
     :endTime
 )
+RETURNING *
+;

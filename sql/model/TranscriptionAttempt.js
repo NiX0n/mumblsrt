@@ -1,3 +1,4 @@
+'use strict';
 class TranscriptionAttemptBase
 {
     id;

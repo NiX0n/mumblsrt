@@ -1,5 +1,4 @@
 'use strict';
-//const { default: Transcription } = require('./sql/model/transcription');
 const 
     {log, error} = console,
     {execSync, spawn} = require('node:child_process'),
@@ -13,7 +12,8 @@ const
     db = new DatabaseSync(dbPath),
     inFile = process.argv[process.argv.length - 1],
     {camelCase, snakeCase} = require('change-case/keys'),
-    TranscriptionAttempt = require('./sql/model/TranscriptionAttempt')
+    TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
+    Transcription = require('./sql/model/Transcription')
 ;
 
 /**
@@ -126,8 +126,8 @@ function initDb(db)
 }
 
 /**
- * 
- * @param {TranscriptionAttempt} attempt 
+ * @param {TranscriptionAttempt|object} attempt
+ * @returns {TranscriptionAttempt}
  */
 function insertAttempt(attempt)
 {
@@ -135,10 +135,11 @@ function insertAttempt(attempt)
     const 
         sql = fs.readFileSync('./sql/INSERT_INTO_transcription_attempt.sql', enc),
         stmt = db.prepare(sql),
-        result = stmt.run(attempt)
+        row = stmt.get(attempt)
     ;
-    attempt.id = result.lastInsertRowid;
-    log("INSERTED attempt:", result);
+    
+    log("INSERTED attempt:", row);
+    return row && new TranscriptionAttempt(row, true);
 }
 
 
@@ -156,17 +157,16 @@ function insertTranscriptions(transcriptions)
 
     transcriptions.forEach(transcription => {
         //log("INSERTING transcription: ", transcription);
-        const result = stmt.run(transcription);
-        transcription.id = result.lastInsertRowid;
-        log("INSERTED transcription:", result);
+        const row = stmt.get(transcription);
+        transcription.assign(row, true);
+        log("INSERTED transcription:", row);
     });
-    log("INSERTED transcriptions:", result);
 }
 
 /**
  * 
  * @param {TranscriptionAttempt} attemptConds
- * @returns TranscriptionAttempt
+ * @returns {TranscriptionAttempt}
  */
 function fetchAttempt(attemptConds)
 {
@@ -176,7 +176,7 @@ function fetchAttempt(attemptConds)
     ;
     //log(sql, parameters);
     const row = stmt.get(parameters);
-    return row && new TranscriptionAttempt(row);
+    return row && new TranscriptionAttempt(row, true);
 }
 
 let attempt = fetchAttempt({
@@ -189,33 +189,37 @@ log(attempt);
 
 if(!attempt)
 {
-    attempt = new TranscriptionAttempt({
+    attempt = insertAttempt({
         parentId: null,
         file: inFile,
         startTime: null,
         endTime: null
-    }, true);
-
-    insertAttempt(attempt);
-    // refresh with full object for consistency
-    //attempt = fetchAttempt({id: attempt.id})
+    });
 }
 
 return;
-const 
-    data = JSON.parse(fs.readFileSync(`${wd}/attempt_${attempt.id}.json`, enc)),
-    /**
-     * @type {Transcription}
-     */
-    transcriptins = data.transcription.map(t => { return { 
-        attemptId: attempt.id,
-        fromOffset: t.offsets.from,
-        toOffset: t.offsets.to,
-        text: t.text,
-        tokens: JSON.stringify(t.tokens)
-     }})
-;
-insertTranscriptions(transcriptins);
+
+/**
+ * @param {TranscriptionAttempt} attempt 
+ */
+function parseAndLoadAttemptJson(attempt)
+{
+    const 
+        data = JSON.parse(fs.readFileSync(`${wd}/attempt_${attempt.id}.json`, enc)),
+        /**
+         * @type {Array<Transcription>}
+         */
+        transcriptions = data.transcription.map(t => { return new Transcription ({ 
+            attemptId: attempt.id,
+            fromOffset: t.offsets.from,
+            toOffset: t.offsets.to,
+            text: t.text,
+            tokens: JSON.stringify(t.tokens)
+        });})
+    ;
+
+    insertTranscriptions(transcriptions);
+}
 
 
 

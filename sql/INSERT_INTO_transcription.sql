@@ -12,3 +12,5 @@ VALUES (
     :text,
     :tokens
 )
+RETURNING *
+;
