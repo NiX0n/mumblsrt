@@ -13,7 +13,8 @@ const
     inFile = process.argv[process.argv.length - 1],
     {camelCase, snakeCase} = require('change-case/keys'),
     TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
-    Transcription = require('./sql/model/Transcription')
+    Transcription = require('./sql/model/Transcription'),
+    TranscriptionStutter = require('./sql/model/TranscriptionStutter')
 ;
 
 /**
@@ -50,7 +51,7 @@ function objToArgs(args)
  * @param {string} attemptFile 
  * @param {*} options 
  */
-function attemptTrancription(attemptFile, options)
+function transcribe(attempt, options)
 {
     //MODEL=./models/ggml-tiny.en.bin
     //#MODEL=./models/ggml-large-v3.bin
@@ -58,6 +59,7 @@ function attemptTrancription(attemptFile, options)
     //#MODEL=./models/ggml-medium.en.bin
     const 
         model = './models/ggml-large-v3-turbo.bin',
+        attemptFile = attemptJsonFilename(attempt),
         ffmpegArgs = {
             // setting undefined, but specificly ordered
             ss: undefined,
@@ -179,7 +181,7 @@ function insertTranscriptions(transcriptions)
 /**
  * 
  * @param {TranscriptionAttempt} attemptConds
- * @returns {TranscriptionAttempt}
+ * @returns {TranscriptionAttempt|undefined}
  */
 function fetchAttempt(attemptConds)
 {
@@ -192,33 +194,48 @@ function fetchAttempt(attemptConds)
     return row && new TranscriptionAttempt(row, true);
 }
 
-let attempt = fetchAttempt({
-    parentId: null,
-    file: inFile
-});
-
-
-log(attempt);
-
-if(!attempt)
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {boolean}
+ */
+function hasTranscriptions(attempt)
 {
-    attempt = insertAttempt({
-        parentId: null,
-        file: inFile,
-        startTime: null,
-        endTime: null
-    });
+    const 
+        sql = fs.readFileSync('./sql/SELECT_COUNT_FROM_transcription.sql', enc),
+        stmt = db.prepare(sql)
+    ;
+    return !!stmt.get({attemptId: attempt.id})?.count;
 }
 
-return;
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {Array<object>}
+ */
+function fetchTranscriptionStutter(attempt)
+{
+    const 
+        sql = fs.readFileSync('./sql/SELECT_stutter_FROM_transcription.sql', enc),
+        stmt = db.prepare(sql)
+    ;
+    return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionStutter(row, true));
+}
+
 
 /**
  * @param {TranscriptionAttempt} attempt 
  */
-function parseAndLoadAttemptJson(attempt)
+function attemptJsonFilename(attempt)
+{
+    return `${wd}/attempt_${attempt.id}.json`;
+}
+
+/**
+ * @param {TranscriptionAttempt} attempt 
+ */
+function parseAndLoadJson(attempt)
 {
     const 
-        data = JSON.parse(fs.readFileSync(`${wd}/attempt_${attempt.id}.json`, enc)),
+        data = JSON.parse(fs.readFileSync(attemptJsonFilename(attempt), enc)),
         /**
          * @type {Array<Transcription>}
          */
@@ -235,5 +252,30 @@ function parseAndLoadAttemptJson(attempt)
 }
 
 
+let attempt = fetchAttempt({
+    parentId: null,
+    file: inFile
+});
 
-//attemptTrancription(inFile);
+log('Attempt:', attempt);
+
+if(!attempt)
+{
+    attempt = insertAttempt({
+        parentId: null,
+        file: inFile,
+        startTime: null,
+        endTime: null
+    });
+}
+
+if(!hasTranscriptions(attempt))
+{
+    if(!fs.existsSync(attemptJsonFilename(attempt)))
+    {
+        transcribe(attempt);
+    }
+    parseAndLoadJson(attempt);
+}
+
+log('Stuttering:', fetchTranscriptionStutter(attempt));

@@ -3,7 +3,7 @@ WITH flagged AS (
         *,
         LAG(text) OVER (ORDER BY id) AS prev_text
     FROM transcription
-    --TODO Add WHERE
+    WHERE attempt_id IN(:attemptId)
 ),
 grouped AS (
     SELECT
@@ -18,14 +18,17 @@ grouped AS (
         END) OVER (ORDER BY id) AS group_id
     FROM flagged
 )
-SELECT * FROM grouped;
 SELECT
+    attempt_id,
     group_id,
     text,
     MIN(id) AS min_id,
     MAX(id) AS max_id,
+    MIN(from_offset) AS min_from_offset,
+    MAX(to_offset) AS max_to_offset,
     COUNT(*) AS count
 FROM grouped
 GROUP BY group_id
-HAVING COUNT(*) > 4
-ORDER BY group_id;
+HAVING COUNT(*) > 3
+ORDER BY group_id
+;
