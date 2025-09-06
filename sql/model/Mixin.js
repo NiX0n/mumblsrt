@@ -32,22 +32,22 @@ module.exports = function Mixin(Base) {
         }
 
         /**
-         * @param {Base|object|null} row 
-         * @param {object|boolean} optionsOrIsProps 
+         * @param {Base|object|null} props 
+         * @param {object|boolean} optionsOrIsRow 
          */
-        constructor(row = null, optionsOrIsProps = false)
+        constructor(props = null, optionsOrIsRow = false)
         {
-            super(row, optionsOrIsProps);
-            if(!row)
+            super(props, optionsOrIsRow);
+            if(!props)
             {
                 return;
             }
 
-            const isProps = 
-                optionsOrIsProps === true 
-                || !!optionsOrIsProps?.isProps
+            const isRow = 
+                optionsOrIsRow === true 
+                || !!optionsOrIsRow?.isProps
             ;
-            this.assign(row, !isProps);
+            this.assign(props, isRow);
         }
 
         /**
