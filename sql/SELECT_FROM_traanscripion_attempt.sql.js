@@ -1,12 +1,14 @@
 'use strict';
-//import TranscriptionAttempt from './model/TranscriptionAttempt';
-const {camelCase, snakeCase} = require('change-case');
-
+const 
+    TranscriptionAttempt = require('./model/TranscriptionAttempt'),
+    {camelCase, snakeCase} = require('change-case')
+;
 /**
  * @param {TranscriptionAttempt} attemptConds 
  * @returns string
  */
-module.exports = (attemptConds) => {
+module.exports = (attemptConds) => 
+{
     const 
         parameters = {},
         sql =  
@@ -15,8 +17,7 @@ module.exports = (attemptConds) => {
 FROM transcription_attempt
 WHERE
     ${
-        // TODO Replace w/ some reflection of model or db
-        ['id','parentId','file'].map(prop => {
+        TranscriptionAttempt.propertyNames.map(prop => {
             if(typeof attemptConds[prop] === 'undefined')
             {
                 return;
@@ -29,12 +30,12 @@ WHERE
             }
 
             parameters[prop] = attemptConds[prop];
-            // this is lazy and isn't doing snake-to-camel or vice versa cases
             return `"${col}" IN(:${prop})`
 
         }).filter(v => !!v).join('\n    AND ')
     }
 `
     ;
+
     return { sql, parameters };
 };

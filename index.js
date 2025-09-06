@@ -12,7 +12,8 @@ const
         `${wd}/db.sqlite3`,
     db = new DatabaseSync(dbPath),
     inFile = process.argv[process.argv.length - 1],
-    { camelCase, snakeCase } = require('change-case/keys')
+    {camelCase, snakeCase} = require('change-case/keys'),
+    TranscriptionAttempt = require('./sql/model/TranscriptionAttempt')
 ;
 
 /**
@@ -174,7 +175,8 @@ function fetchAttempt(attemptConds)
         stmt = db.prepare(sql)
     ;
     log(sql, parameters);
-    return camelCase(stmt.get(parameters));
+    const row = stmt.get(parameters);
+    return row && new TranscriptionAttempt(row);
 }
 
 let attempt = fetchAttempt({
@@ -184,7 +186,7 @@ let attempt = fetchAttempt({
 
 
 log(attempt);
-
+return;
 if(!attempt)
 {
     attempt = {
