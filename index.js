@@ -10,15 +10,19 @@ const
     dbPath = 
         //':memory:' || 
         `${wd}/db.sqlite3`,
-    db = new DatabaseSync(dbPath),
     file = process.argv[process.argv.length - 1],
     srtFile = `${file}.srt`,
+    MAX_RECURSION = 7,
     {camelCase, snakeCase} = require('change-case/keys'),
     TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
     Transcription = require('./sql/model/Transcription'),
     TranscriptionStutter = require('./sql/model/TranscriptionStutter')
 ;
-let isDbInit = dbPath.startsWith(':') ? false : fs.existsSync(dbPath)
+let 
+    isDbInit = dbPath.startsWith(':') ? false : fs.existsSync(dbPath),
+    db = new DatabaseSync(dbPath)
+;
+
 
 /**
  * 
@@ -123,11 +127,11 @@ function transcribe(attempt, options = {})
  */
 function initDb(db)
 {
+    log('Initializing database');
     [
         `${__dirname}/sql/CREATE_TABLE_transcription_attempt.sql`,
         `${__dirname}/sql/CREATE_TABLE_transcription.sql`,
     ].forEach(sqlFile => {
-        log(sqlFile);
         db.exec(fs.readFileSync(sqlFile, enc));
     });
 }
@@ -314,6 +318,11 @@ function parseAndInsertTranscriptionJson(attempt)
  */
 (async function main (attempt = null) 
 {
+    main._depth = (main._depth || 0) + 1;
+    if (main._depth > MAX_RECURSION) {
+        throw new Error(`Recursion limit exceeded`);
+    }
+
     if(!isDbInit)
     {
         initDb(db);
@@ -362,13 +371,17 @@ function parseAndInsertTranscriptionJson(attempt)
         });
 
         const childAttempt = new TranscriptionAttempt({
-            startTime:  Math.floor(stutter.minFromOffset / 1000),
-            endTime: Math.ceil(stutter.maxToOffset / 1000),
+            startTime: (attempt.startTime || 0) + Math.floor(stutter.minFromOffset / 1000),
+            endTime: (attempt.startTime || 0) + Math.ceil(stutter.maxToOffset / 1000),
             parentId: attempt.id,
             file: attempt.file
         });
-        
-        await main(childAttempt);
+        try {
+            await main(childAttempt);
+        } finally {
+            // Always decrement depth when unwinding
+            main._depth--;
+        }
     };
 
     if(!attempt.parentId)
