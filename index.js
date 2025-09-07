@@ -10,14 +10,15 @@ const
     dbPath = 
         //':memory:' || 
         `${wd}/db.sqlite3`,
-    isDbInit = fs.existsSync(dbPath),
     db = new DatabaseSync(dbPath),
     file = process.argv[process.argv.length - 1],
+    srtFile = `${file}.srt`,
     {camelCase, snakeCase} = require('change-case/keys'),
     TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
     Transcription = require('./sql/model/Transcription'),
     TranscriptionStutter = require('./sql/model/TranscriptionStutter')
 ;
+let isDbInit = dbPath.startsWith(':') ? false : fs.existsSync(dbPath)
 
 /**
  * 
@@ -219,6 +220,38 @@ function fetchAttempt(attemptConds)
 }
 
 /**
+ * 
+ * @param {Transcription|object} conds
+ * @returns {Array<Transcription>}
+ */
+function fetchTranscriptions(conds)
+{
+    const 
+        {sql, parameters} = require('./sql/SELECT_FROM_transcription.sql')(conds),
+        stmt = db.prepare(sql)
+    ;
+    const rows = stmt.all(parameters);
+    return rows?.length && rows.map(row => new Transcription(row, true));
+}
+
+/**
+ * 
+ * @param {Transcription|object} conds
+ * @returns {Array<Transcription>}
+ */
+function fetchMergedTranscriptions(conds)
+{
+    const
+        sql = require('./sql/SELECT_merged_FROM_transcription.sql'),
+        parameters = {file: conds.file},
+        stmt = db.prepare(sql)
+    ;
+    const rows = stmt.all(parameters);
+    //log(rows); process.exit();
+    return rows?.length && rows.map(row => new Transcription(row, true));
+}
+
+/**
  * @param {TranscriptionAttempt} attempt 
  * @returns {boolean}
  */
@@ -284,6 +317,7 @@ function parseAndInsertTranscriptionJson(attempt)
     if(!isDbInit)
     {
         initDb(db);
+        isDbInit = true;
     }
 
     // If no attempt passed (base recursion run)
@@ -314,11 +348,11 @@ function parseAndInsertTranscriptionJson(attempt)
     const stutterings = fetchTranscriptionStutter(attempt);
     if(!stutterings?.length)
     {
-        log("No stuttering found");
-        return;
+        log("No stuttering in this attempt");
     }
 
-    stutterings.forEach(stutter => {
+    for(const stutter of stutterings)
+    {
         log('Stuttering found:', stutter);
         // De-Activate stuttering transcriptions
         updateTranscriptions({
@@ -334,7 +368,16 @@ function parseAndInsertTranscriptionJson(attempt)
             file: attempt.file
         });
         
-        main(childAttempt);
-    });
+        await main(childAttempt);
+    };
 
+    if(!attempt.parentId)
+    {
+        const 
+            transcriptions = fetchMergedTranscriptions(attempt),
+            srt = require('./srt')(transcriptions)
+        ;
+        fs.writeFileSync(srtFile, srt, enc);
+        log(`Succfully generated srt file`, srtFile);
+    }
 })();
