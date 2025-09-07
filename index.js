@@ -2,16 +2,17 @@
 const 
     {log, error} = console,
     Promise = require('bluebird'),
-    {execSync, spawn} = require('node:child_process'),
-    wd = './tmp' || fs.mkdtempSync(),
+    {exec, execSync, spawn} = require('node:child_process'),
+    wd = `${__dirname}/tmp` || fs.mkdtempSync(),
     fs = require('fs'),
     enc = {encoding: 'utf8'},
     {DatabaseSync} = require('node:sqlite'),
     dbPath = 
         //':memory:' || 
         `${wd}/db.sqlite3`,
+    isDbInit = fs.existsSync(dbPath),
     db = new DatabaseSync(dbPath),
-    inFile = process.argv[process.argv.length - 1],
+    file = process.argv[process.argv.length - 1],
     {camelCase, snakeCase} = require('change-case/keys'),
     TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
     Transcription = require('./sql/model/Transcription'),
@@ -54,7 +55,7 @@ function objToArgs(args)
  */
 function transcribe(attempt, options = {})
 {
-    return Promise((res, rej) => {
+    return new Promise((res, rej) => {
     const 
         model = './models/ggml-large-v3-turbo.bin',
         attemptFile = attemptJsonFilename(attempt),
@@ -79,8 +80,8 @@ function transcribe(attempt, options = {})
             // whisper-cli will re-append this extension
             of: attemptFile.replace(/\.json$/i, '')
         },
-        spawnOptions = {
-            cwd: '~/src/whisper.cpp'
+        execOptions = {
+            cwd: `${process.env.HOME}/src/whisper.cpp/`
         }
     ;
 
@@ -97,13 +98,13 @@ function transcribe(attempt, options = {})
     }
 
     const cmd = `ffmpeg${objToArgs(ffmpegArgs)} - | ./build/bin/whisper-cli${objToArgs(cliArgs)} -f -`;
-    log('Spawning:', cmd);
+    log('Executing:', cmd);
     
-    const child = spawn(cmd, spawnOptions);
+    const child = exec(cmd, execOptions);
 
     child.stdout.on('data', log);
     child.stderr.on('data', error);
-
+    child.on('error', rej);
     child.on('close', (code) => {
         if(!code)
         {
@@ -111,6 +112,7 @@ function transcribe(attempt, options = {})
         }
         rej(`ffmpeg/whisper-cli process exited with code ${code}`);
     });
+    
     });// new Promise()
 }
 
@@ -121,8 +123,8 @@ function transcribe(attempt, options = {})
 function initDb(db)
 {
     [
-        './sql/CREATE_TABLE_transcription_attempt.sql',
-        './sql/CREATE_TABLE_transcription.sql',
+        `${__dirname}/sql/CREATE_TABLE_transcription_attempt.sql`,
+        `${__dirname}/sql/CREATE_TABLE_transcription.sql`,
     ].forEach(sqlFile => {
         log(sqlFile);
         db.exec(fs.readFileSync(sqlFile, enc));
@@ -137,12 +139,11 @@ function insertAttempt(attempt)
 {
     log("INSERTING attempt");
     const 
-        sql = fs.readFileSync('./sql/INSERT_INTO_transcription_attempt.sql', enc),
-        stmt = db.prepare(sql),
-        row = stmt.get(attempt)
+        {sql, parameters} = require('./sql/INSERT_INTO_transcription_attempt.sql')(attempt),
+        stmt = db.prepare(sql)
     ;
-    
-    log("INSERTED attempt:", row);
+    const row = stmt.get(parameters);
+    log("INSERTED attempt", attempt);
     return row && new TranscriptionAttempt(row, true);
 }
 
@@ -156,14 +157,16 @@ function insertTranscriptions(transcriptions)
 {
     log("INSERTING transcriptions");
     const 
-        sql = fs.readFileSync('./sql/INSERT_INTO_transcription.sql', enc),
-        stmt = db.prepare(sql),
         inserted = []
     ;
 
     transcriptions.forEach(transcription => {
         //log("INSERTING transcription: ", transcription);
-        const row = stmt.get(transcription);
+        const 
+            {sql, parameters} = require('./sql/INSERT_INTO_transcription.sql')(transcription),
+            stmt = db.prepare(sql),
+            row = stmt.get(parameters)
+        ;
         if(!row) { return; }
         if(transcription instanceof Transcription)
         {
@@ -175,10 +178,29 @@ function insertTranscriptions(transcriptions)
             inserted.push(new Transcription(row, true));
         }
         
-        log("INSERTED transcription:", row);
+        log("INSERTED transcription:", transcription);
     });
     return inserted;
 }
+
+/**
+ * @param {TranscriptionAttempt|object} transcription
+ * @returns void
+ */
+function updateTranscriptions(changes, conds)
+{
+    const 
+        {sql, parameters} = require('./sql/UPDATE_transcription.sql')(changes, conds),
+        stmt = db.prepare(sql)
+    ;
+    log("UPDATING transcriptions", parameters);
+    
+    const rows = stmt.all(parameters);
+    log("UPDATED transcriptions", rows.length);
+    // TODO return something meaningful
+    return true;
+}
+
 
 /**
  * 
@@ -203,7 +225,7 @@ function fetchAttempt(attemptConds)
 function hasTranscriptions(attempt)
 {
     const 
-        sql = fs.readFileSync('./sql/SELECT_COUNT_FROM_transcription.sql', enc),
+        sql = fs.readFileSync(`${__dirname}/sql/SELECT_COUNT_FROM_transcription.sql`, enc),
         stmt = db.prepare(sql)
     ;
     return !!stmt.get({attemptId: attempt.id})?.count;
@@ -216,7 +238,7 @@ function hasTranscriptions(attempt)
 function fetchTranscriptionStutter(attempt)
 {
     const 
-        sql = fs.readFileSync('./sql/SELECT_stutter_FROM_transcription.sql', enc),
+        sql = fs.readFileSync(`${__dirname}/sql/SELECT_stutter_FROM_transcription.sql`, enc),
         stmt = db.prepare(sql)
     ;
     return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionStutter(row, true));
@@ -253,51 +275,66 @@ function parseAndInsertTranscriptionJson(attempt)
     insertTranscriptions(transcriptions);
 }
 
-
-let attempt = fetchAttempt({
-    parentId: null,
-    file: inFile
-});
-
-log('Attempt:', attempt);
-
-if(!attempt)
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns void
+ */
+(async function main (attempt = null) 
 {
-    attempt = insertAttempt({
-        parentId: null,
-        file: inFile,
-        startTime: null,
-        endTime: null
-    });
-}
-
-if(!hasTranscriptions(attempt))
-{
-    if(!fs.existsSync(attemptJsonFilename(attempt)))
+    if(!isDbInit)
     {
-        transcribe(attempt);
+        initDb(db);
     }
-    parseAndInsertTranscriptionJson(attempt);
-}
 
-const stutterings = fetchTranscriptionStutter(attempt);
-if(!stutterings?.length)
-{
-    log("No stuttering found");
-    return;
-}
+    // If no attempt passed (base recursion run)
+    // Or our passed attempt hasn't found yet
+    if(!attempt?.id)
+    {
+        attempt = fetchAttempt(attempt || {file}) || attempt;
+    }
 
-stutterings.forEach(stutter => {
-    let newAttempt = new TranscriptionAttempt({
-        startTime:  Math.floor(stutter.minFromOffset / 1000),
-        endTime: Math.ceil(stutter.maxToOffset / 1000),
-        parentId: attempt.id,
-        file: attempt.file
+    // If we've never run against this file before
+    if(!attempt?.id)
+    {
+        attempt = insertAttempt(attempt || {file: file});
+    }
+
+    log('Attempt:', attempt);
+    //if(attempt?.parentId) { log('recursion over'); return; }
+
+    if(!hasTranscriptions(attempt))
+    {
+        if(!fs.existsSync(attemptJsonFilename(attempt)))
+        {
+            await transcribe(attempt);
+        }
+        parseAndInsertTranscriptionJson(attempt);
+    }
+
+    const stutterings = fetchTranscriptionStutter(attempt);
+    if(!stutterings?.length)
+    {
+        log("No stuttering found");
+        return;
+    }
+
+    stutterings.forEach(stutter => {
+        log('Stuttering found:', stutter);
+        // De-Activate stuttering transcriptions
+        updateTranscriptions({
+            isActive: 0
+        }, {
+            id: {min: stutter.minId, max: stutter.maxId}
+        });
+
+        const childAttempt = new TranscriptionAttempt({
+            startTime:  Math.floor(stutter.minFromOffset / 1000),
+            endTime: Math.ceil(stutter.maxToOffset / 1000),
+            parentId: attempt.id,
+            file: attempt.file
+        });
+        
+        main(childAttempt);
     });
 
-    attempt = fetchAttempt(attempt) || attempt;
-    
-    log('Stuttering found:', stutter);
-    log('New attempt:', newAttempt);
-});
-
+})();

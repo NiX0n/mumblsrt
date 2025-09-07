@@ -1,22 +1,22 @@
 'use strict';
 const 
-    Transcription = require('./model/Transcription'),
+    TranscriptionAttempt = require('./model/TranscriptionAttempt'),
     {camelCase, snakeCase} = require('change-case')
 ;
 /**
- * @param {Transcription} transcription 
- * @returns string
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {sql: string, parameters: object}
  */
-module.exports = (transcription) => 
+module.exports = (attempt) => 
 {
     const 
         columnNames = [],
         parameters = {}
     ;
-    Transcription.propertyNames.forEach(prop => {
+    TranscriptionAttempt.propertyNames.forEach(prop => {
         if(
-            typeof transcription[prop] === 'undefined'
-            || transcription[prop] === null
+            typeof attempt[prop] === 'undefined'
+            || attempt[prop] === null
         )
         {
             return;
@@ -24,7 +24,7 @@ module.exports = (transcription) =>
         
         const col = snakeCase(prop);
         columnNames.push(col);
-        parameters[prop] = transcription[prop];
+        parameters[prop] = attempt[prop];
     });
 
     if(!columnNames.length)
@@ -33,7 +33,7 @@ module.exports = (transcription) =>
     }
 
     const sql =  
-`INSERT INTO transcription (
+`INSERT INTO transcription_attempt (
     ${columnNames.join(', ')}
 )
 VALUES (

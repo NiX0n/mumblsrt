@@ -5,7 +5,7 @@ const
 ;
 /**
  * @param {TranscriptionAttempt} attemptConds 
- * @returns string
+ * @returns {sql: string, parameters: object}
  */
 module.exports = (attemptConds) => 
 {

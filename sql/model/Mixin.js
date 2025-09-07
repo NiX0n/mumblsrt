@@ -1,6 +1,6 @@
 'use strict';
 const 
-    changeCase = require('change-case'),
+    {camelCase, snakeCase} = require('change-case'),
     changeKeysCase = require('change-case/keys')
 ;
 module.exports = function Mixin(Base) {
@@ -28,7 +28,7 @@ module.exports = function Mixin(Base) {
          * @type {Array<string>}
          */
         static get columnNames() {
-            return changeKeysCase(this.propertyNames);
+            return this.propertyNames.map(snakeCase);
         }
 
         /**
