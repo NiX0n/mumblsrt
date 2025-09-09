@@ -5,7 +5,9 @@ const
     {exec, execSync, spawn} = require('node:child_process'),
     wd = `${__dirname}/tmp` || fs.mkdtempSync(),
     fs = require('fs'),
+    path = require("node:path"),
     enc = {encoding: 'utf8'},
+    crypto = require('crypto'),
     {DatabaseSync} = require('node:sqlite'),
     dbPath = 
         //':memory:' || 
@@ -53,17 +55,32 @@ function objToArgs(args)
     return argString;
 }
 
+
+/**
+ * @param {TranscriptionAttempt} attempt 
+ */
+function wavFilename(attempt)
+{
+    const 
+        base = snakeCase(path.basename(attempt.file)),
+        hash = crypto.createHash('md5').update(attempt.file).digest('hex')
+    ;
+    return `${wd}/${hash}_${base}.wav`;
+}
+
 /**
  * 
  * @param {TranscriptionAttempt} attempt 
  * @param {object} options 
+ * @returns {Promise<void>} resolves on success
+ * @throws {Error} and rejects on failure
  */
-function transcribe(attempt, options = {})
+function transcribe(attempt, options = {}) { return new Promise((res, rej) => 
 {
-    return new Promise((res, rej) => {
     const 
         model = './models/ggml-large-v3-turbo.bin',
         attemptFile = attemptJsonFilename(attempt),
+        wavFile = wavFilename(attempt),
         ffmpegArgs = {
             ss: Number.isInteger(attempt.startTime) ? attempt.startTime : undefined,
             to: Number.isInteger(attempt.endTime) ? attempt.endTime : undefined,
@@ -102,9 +119,37 @@ function transcribe(attempt, options = {})
         }
     }
 
-    const cmd = `ffmpeg${objToArgs(ffmpegArgs)} - | ./build/bin/whisper-cli${objToArgs(cliArgs)} -f -`;
+    if(
+        typeof options?.i === 'undefined'
+        && fs.existsSync(wavFile)
+    )
+    {
+        // whisper-cli supports the wav file directly
+        // however, we're using ffmpeg to send only 
+        // specific segments of audio on subsequent passes
+        ffmpegArgs.i = wavFile;
+    }
+
+    // Use ffmpeg to re-encode arbitrary video/audio sources into standard wav audio
+    const cmdChain = [`ffmpeg${objToArgs(ffmpegArgs)} -`];
+
+    if(
+        // is this the first run?
+        typeof ffmpegArgs.ss === 'undefined'
+        // does the cache file not exist yet?
+        && !fs.existsSync(wavFile)
+    )
+    {
+        // We're goign to cache the wav stream to reduce overhead later
+        cmdChain.push(`tee "${wavFile}"`);
+    }
+
+    // Use whisper to parse just the audio stream we want.
+    cmdChain.push(`./build/bin/whisper-cli${objToArgs(cliArgs)} -f -`);
+
+    // Pipe it all together
+    const cmd = cmdChain.join(' | ');
     log('Executing:', cmd);
-    
     const child = exec(cmd, execOptions);
 
     child.stdout.on('data', log);
@@ -118,8 +163,7 @@ function transcribe(attempt, options = {})
         rej(`ffmpeg/whisper-cli process exited with code ${code}`);
     });
     
-    });// new Promise()
-}
+});/*new Promise()*/}
 
 /**
  * 
@@ -359,6 +403,12 @@ function parseAndInsertTranscriptionJson(attempt)
     {
         log("No stuttering in this attempt");
     }
+    else if(main._depth == MAX_RECURSION)
+    {
+        log("Reursion limit reached. Settling with mediocrity.");
+        // We've failed enough times.  Just stop.
+        return;
+    }
 
     for(const stutter of stutterings)
     {
@@ -375,7 +425,7 @@ function parseAndInsertTranscriptionJson(attempt)
             endTime: (attempt.startTime || 0) + Math.ceil(stutter.maxToOffset / 1000),
             parentId: attempt.id,
             file: attempt.file
-        });
+        }); 
         try {
             await main(childAttempt);
         } finally {
