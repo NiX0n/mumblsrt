@@ -18,7 +18,7 @@ const
     {camelCase, snakeCase} = require('change-case/keys'),
     TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
     Transcription = require('./sql/model/Transcription'),
-    TranscriptionStutter = require('./sql/model/TranscriptionStutter')
+    TranscriptionRange = require('./sql/model/TranscriptionRange')
 ;
 let 
     isDbInit = dbPath.startsWith(':') ? false : fs.existsSync(dbPath),
@@ -314,15 +314,15 @@ function hasTranscriptions(attempt)
 
 /**
  * @param {TranscriptionAttempt} attempt 
- * @returns {Array<TranscriptionStutter>}
+ * @returns {Array<TranscriptionRange>}
  */
-function fetchTranscriptionStutter(attempt)
+function fetchInterTranscriptionStutter(attempt)
 {
     const 
         sql = fs.readFileSync(`${__dirname}/sql/SELECT_stutter_FROM_transcription.sql`, enc),
         stmt = db.prepare(sql)
     ;
-    return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionStutter(row, true));
+    return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionRange(row, true));
 }
 
 
@@ -398,16 +398,18 @@ function parseAndInsertTranscriptionJson(attempt)
         parseAndInsertTranscriptionJson(attempt);
     }
 
-    const stutterings = fetchTranscriptionStutter(attempt);
+    if(main._depth >= MAX_RECURSION)
+    {
+        log("Reursion limit reached. Settling with whatever we have.");
+        // We've failed enough times.  Just stop.
+        // Reurning early is OK, because rendering SRT only happens on base recursion run
+        return;
+    }
+
+    const stutterings = fetchInterTranscriptionStutter(attempt);
     if(!stutterings?.length)
     {
         log("No stuttering in this attempt");
-    }
-    else if(main._depth == MAX_RECURSION)
-    {
-        log("Reursion limit reached. Settling with mediocrity.");
-        // We've failed enough times.  Just stop.
-        return;
     }
 
     for(const stutter of stutterings)
@@ -434,8 +436,10 @@ function parseAndInsertTranscriptionJson(attempt)
         }
     };
 
+    // Is this the base run of main()?
     if(!attempt.parentId)
     {
+        // Render the merged transcriptions from all the attempts
         const 
             transcriptions = fetchMergedTranscriptions(attempt),
             srt = require('./srt')(transcriptions)
