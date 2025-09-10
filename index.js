@@ -325,6 +325,20 @@ function fetchInterTranscriptionStutter(attempt)
     return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionRange(row, true));
 }
 
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {Array<TranscriptionRange>}
+ */
+function fetchIntraTranscriptionStutter(attempt)
+{
+    const 
+        sql = fs.readFileSync(`${__dirname}/sql/SELECT_intrastutter_FROM_transcription.sql`, enc),
+        parameters = {attemptId: attempt.id}, 
+        stmt = db.prepare(sql)
+    ;
+    return stmt.all(parameters).map(row => new TranscriptionRange(row, true));
+}
+
 
 /**
  * @param {TranscriptionAttempt} attempt 
@@ -367,6 +381,8 @@ function parseAndInsertTranscriptionJson(attempt)
         throw new Error(`Recursion limit exceeded`);
     }
 
+    log("Beginning attempt at depth:", main._depth);
+
     if(!isDbInit)
     {
         initDb(db);
@@ -406,35 +422,55 @@ function parseAndInsertTranscriptionJson(attempt)
         return;
     }
 
-    const stutterings = fetchInterTranscriptionStutter(attempt);
-    if(!stutterings?.length)
+    const interStutterings = fetchInterTranscriptionStutter(attempt);
+    if(!interStutterings?.length)
     {
-        log("No stuttering in this attempt");
+        log("No inter-transcription stuttering in this attempt");
+    }
+    else
+    {
+        await processStutter(interStutterings);
     }
 
-    for(const stutter of stutterings)
+    const infraStutterings = fetchIntraTranscriptionStutter(attempt);
+    if(!infraStutterings?.length)
     {
-        log('Stuttering found:', stutter);
-        // De-Activate stuttering transcriptions
-        updateTranscriptions({
-            isActive: 0
-        }, {
-            id: {min: stutter.minId, max: stutter.maxId}
-        });
+        log("No infra-transcription stuttering in this attempt");
+    }
+    else
+    {
+        await processStutter(infraStutterings);
+    }
 
-        const childAttempt = new TranscriptionAttempt({
-            startTime: (attempt.startTime || 0) + Math.floor(stutter.minFromOffset / 1000),
-            endTime: (attempt.startTime || 0) + Math.ceil(stutter.maxToOffset / 1000),
-            parentId: attempt.id,
-            file: attempt.file
-        }); 
-        try {
-            await main(childAttempt);
-        } finally {
-            // Always decrement depth when unwinding
-            main._depth--;
-        }
-    };
+    /**
+     * @param {TranscriptionRange} stutterings 
+     */
+    async function processStutter(stutterings)
+    {
+        for(const stutter of stutterings)
+        {
+            log('Stuttering found:', stutter);
+            // De-Activate stuttering transcriptions
+            updateTranscriptions({
+                isActive: 0
+            }, {
+                id: {min: stutter.minId, max: stutter.maxId}
+            });
+
+            const childAttempt = new TranscriptionAttempt({
+                startTime: (attempt.startTime || 0) + Math.floor(stutter.minFromOffset / 1000),
+                endTime: (attempt.startTime || 0) + Math.ceil(stutter.maxToOffset / 1000),
+                parentId: attempt.id,
+                file: attempt.file
+            }); 
+            try {
+                await main(childAttempt);
+            } finally {
+                // Always decrement depth when unwinding
+                main._depth--;
+            }
+        };
+    }
 
     // Is this the base run of main()?
     if(!attempt.parentId)
@@ -445,6 +481,7 @@ function parseAndInsertTranscriptionJson(attempt)
             srt = require('./srt')(transcriptions)
         ;
         fs.writeFileSync(srtFile, srt, enc);
-        log(`Succfully generated srt file`, srtFile);
+        log(`Successfully generated srt file:`, srtFile);
+        log('Runtime (secs):', process.uptime());
     }
 })();
