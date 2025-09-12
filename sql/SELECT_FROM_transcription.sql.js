@@ -10,48 +10,73 @@ const
  */
 module.exports = (conds) => 
 {
-    let 
+    const 
         parameters = {},
-        sql =  
-`SELECT 
-    *
-FROM transcription
-WHERE
-    ${
-        Transcription.propertyNames.map(prop => {
-            if(typeof conds[prop] === 'undefined')
-            {
-                return;
-            }
-            
-            const col = snakeCase(prop);
-            if(!columnNames.includes(col))
-            {
-                return;
-            }
-
-            if(conds[prop] === null)
-            {
-                return `"${col}" IS NULL`;
-            }
-
-            parameters[prop] = conds[prop];
-            return `"${col}" IN(:${prop})`
-
-        }).filter(v => !!v).join('\n    AND ')
-    }
-`
+        where = [],
+        orderBy = []
     ;
-    
+    Transcription.propertyNames.forEach(prop => {
+        const 
+            value = conds[prop]
+            col = snakeCase(prop)
+        ;
+
+        if(typeof value === 'undefined')
+        {
+            return;
+        }
+        
+        if(!columnNames.includes(col))
+        {
+            return;
+        }
+
+        if(value === null)
+        {
+            where.push(`"${col}" IS NULL`);
+            return;
+        }
+
+        if(typeof value?.min !== 'undefined')
+        {
+            const 
+                minParam = `${prop}_min`,
+                maxParam = `${prop}_max`
+            ;
+            parameters[minParam] = value.min;
+            parameters[maxParam] = value.max;
+            where.push(`"${col}" BETWEEN :${minParam} AND :${maxParam}`);
+            return;
+        }
+
+        parameters[prop] = conds[prop];
+        where.push(`"${col}" IN(:${prop})`);
+
+    });
+
     if(conds.orderBy)
     {
-        sql += `ORDER BY ${conds.orderBy.map(([col, dir]) => {
+        conds.orderBy.forEach(([col, isDesc]) => {
             if(!columnNames.includes(col))
             {
                 throw new Error(`"Invalid ORDER BY column '${col}'`);
             }
-            return `${col} ${dir || "ASC"}`;
-        }).join(', ')}`; 
+            orderBy.push(`"${col}" ${isDesc ? "DESC" : "ASC"}`);
+        }); 
+    }
+
+    let sql =  
+`SELECT 
+    *
+FROM transcription
+WHERE
+    ${where.filter(v => !!v).join('\n    AND ')}
+`
+    ;
+    
+    if(orderBy.length)
+    {
+        sql += `ORDER BY ${orderBy.join(', ')}`;
     }
 
     return { sql, parameters };

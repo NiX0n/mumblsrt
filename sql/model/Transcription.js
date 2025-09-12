@@ -21,6 +21,13 @@ class TranscriptionBase
     isActive;
 
     /**
+     * Flag suspicious transcriptions.
+     * Will likely be flagged as inactive.
+     * @type {number}
+     */
+    isSuspect;    
+
+    /**
      * Timestamp (ms) at begin of subtitle
      * @type {number}
      */

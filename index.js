@@ -3,17 +3,19 @@ const
     {log, error} = console,
     Promise = require('bluebird'),
     {exec, execSync, spawn} = require('node:child_process'),
-    wd = `${__dirname}/tmp` || fs.mkdtempSync(),
     fs = require('fs'),
     path = require("node:path"),
     enc = {encoding: 'utf8'},
+    wd = `${__dirname}/tmp` || fs.mkdtempSync(),
     crypto = require('crypto'),
     {DatabaseSync} = require('node:sqlite'),
     dbPath = 
         //':memory:' || 
         `${wd}/db.sqlite3`,
     file = process.argv[process.argv.length - 1],
+    // @TODO make these paramters into this script
     srtFile = `${file}.srt`,
+    promotFile = `${wd}/prompt.txt`,
     MAX_RECURSION = 7,
     {camelCase, snakeCase} = require('change-case/keys'),
     TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
@@ -91,12 +93,14 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
             ar: 16000
         },
         cliArgs = {
-            t: 20,
+            p: 4,
+            t: 5,
             bo: 7,
             bs: 7,
             nf: null,
             nth: 0.20,
             ml: 200,
+            //tp: 0.05,
             m: model,
             ojf: null,
             // whisper-cli will re-append this extension
@@ -106,6 +110,12 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
             cwd: `${process.env.HOME}/src/whisper.cpp/`
         }
     ;
+
+    if(fs.existsSync(promotFile))
+    {
+        // notice that we're hacking --prompt into our shorter -scheme
+        cliArgs['-prompt'] = fs.readFileSync(promotFile, enc);
+    }
 
     for(const op in options)
     {
@@ -342,6 +352,35 @@ function fetchIntraTranscriptionStutter(attempt)
 
 /**
  * @param {TranscriptionAttempt} attempt 
+ * @returns {Array<TranscriptionRange>}
+ */
+function fetchZeroLengthTranscriptions(attempt)
+{
+    const 
+        sql = fs.readFileSync(`${__dirname}/sql/SELECT_zerolens_FROM_transcription.sql`, enc),
+        parameters = {attemptId: attempt.id}, 
+        stmt = db.prepare(sql)
+    ;
+    return stmt.all(parameters).map(row => new TranscriptionRange(row, true));
+}
+
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {Array<TranscriptionRange>}
+ */
+function fetchSuspectTranscriptions(attempt)
+{
+    const 
+        sql = fs.readFileSync(`${__dirname}/sql/SELECT_suspect_ranges_FROM_transcription.sql`, enc),
+        parameters = {attemptId: attempt.id}, 
+        stmt = db.prepare(sql)
+    ;
+    return stmt.all(parameters).map(row => new TranscriptionRange(row, true));
+}
+
+
+/**
+ * @param {TranscriptionAttempt} attempt 
  */
 function attemptJsonFilename(attempt)
 {
@@ -369,6 +408,24 @@ function parseAndInsertTranscriptionJson(attempt)
 
     insertTranscriptions(transcriptions);
 }
+
+/**
+ * @param {TranscriptionRange} stutterings 
+ */
+function flagRangeSuspect(ranges)
+{
+    for(const range of ranges)
+    {
+        log('Suspect transcription range updating:', range);
+        // Flag range
+        updateTranscriptions({
+            isSuspect: 1
+        }, {
+            id: {min: range.minId, max: range.maxId}
+        });
+    }
+}
+
 
 /**
  * @param {TranscriptionAttempt} attempt 
@@ -429,48 +486,52 @@ function parseAndInsertTranscriptionJson(attempt)
     }
     else
     {
-        await processStutter(interStutterings);
+        log('Inter-transcriptin stuttering found:', interStutterings.length);
+        flagRangeSuspect(interStutterings);
     }
 
     const infraStutterings = fetchIntraTranscriptionStutter(attempt);
     if(!infraStutterings?.length)
     {
-        log("No infra-transcription stuttering in this attempt");
+        log("No intra-transcription stuttering in this attempt");
     }
     else
     {
-        await processStutter(infraStutterings);
+        log('Intra-transcriptin stuttering found:', infraStutterings.length);
+        flagRangeSuspect(infraStutterings);
     }
 
-    /**
-     * @param {TranscriptionRange} stutterings 
-     */
-    async function processStutter(stutterings)
+    const zeroLens = fetchZeroLengthTranscriptions(attempt);
+    if(zeroLens.length)
     {
-        for(const stutter of stutterings)
-        {
-            log('Stuttering found:', stutter);
-            // De-Activate stuttering transcriptions
-            updateTranscriptions({
-                isActive: 0
-            }, {
-                id: {min: stutter.minId, max: stutter.maxId}
-            });
-
-            const childAttempt = new TranscriptionAttempt({
-                startTime: (attempt.startTime || 0) + Math.floor(stutter.minFromOffset / 1000),
-                endTime: (attempt.startTime || 0) + Math.ceil(stutter.maxToOffset / 1000),
-                parentId: attempt.id,
-                file: attempt.file
-            }); 
-            try {
-                await main(childAttempt);
-            } finally {
-                // Always decrement depth when unwinding
-                main._depth--;
-            }
-        };
+        log('Zero length transcription ranges found:', zeroLens.length);
+        flagRangeSuspect(zeroLens);
     }
+
+    const suspects = fetchSuspectTranscriptions(attempt);
+    for(const suspect of suspects)
+    {
+        log('Suspect found:', suspect);
+        // De-Activate stuttering transcriptions
+        updateTranscriptions({
+            isActive: 0
+        }, {
+            id: {min: suspect.minId, max: suspect.maxId}
+        });
+
+        const childAttempt = new TranscriptionAttempt({
+            startTime: (attempt.startTime || 0) + Math.floor(suspect.minFromOffset / 1000),
+            endTime: (attempt.startTime || 0) + Math.ceil(suspect.maxToOffset / 1000),
+            parentId: attempt.id,
+            file: attempt.file
+        }); 
+        try {
+            await main(childAttempt);
+        } finally {
+            // Always decrement depth when unwinding
+            main._depth--;
+        }
+    };
 
     // Is this the base run of main()?
     if(!attempt.parentId)
