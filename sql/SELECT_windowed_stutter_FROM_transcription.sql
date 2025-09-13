@@ -1,14 +1,15 @@
 WITH RECURSIVE
--- 1. Tokenize text into words
+-- Tokenize text into words
 split_words(id, word, rest) AS (
     SELECT
         id,
         SUBSTR(text, 1, INSTR(text || ' ', ' ') - 1),
         SUBSTR(text, INSTR(text || ' ', ' ') + 1)
     FROM transcription
-    WHERE 
-        LENGTH(text) > 0x20
-        AND attempt_id IN(:attemptId)
+    --WHERE 
+    --    LENGTH(text) > 0x20
+        -- Ignoring this for testing
+        --AND attempt_id IN(:attemptId)
     
     UNION ALL
 
@@ -20,7 +21,7 @@ split_words(id, word, rest) AS (
     WHERE rest <> ''
 ),
 
--- 2. Count repeats of each word per row
+-- Count repeats of each word per row
 word_counts AS (
     SELECT
         id,
@@ -31,41 +32,48 @@ word_counts AS (
     GROUP BY id, word
 ),
 
--- 3. Mean word count per row (your original logic)
-aggregated AS (
-    SELECT
-        id,
-        AVG(word_count) AS mean_word_count
-    FROM word_counts
-    GROUP BY id
-),
-
--- 4. Define the window sizes you want to check
+-- Define the window sizes you want to check
 window_sizes(size) AS (
     VALUES (1), (2), (3), (5)  -- tune as needed
 ),
 
--- 5. For each window size, compute sliding mean of mean_word_count
+-- For each window size, compute sliding sum of word_count
 windowed AS (
     SELECT
         a.id,
-        w.size,
-        AVG(a.mean_word_count) OVER (
-            ORDER BY a.id
-            ROWS BETWEEN w.size - 1 PRECEDING AND w.size - 1 FOLLOWING
-        ) AS window_avg
-    FROM aggregated a
+        w.size AS window_size,
+        b.word,
+        SUM(b.word_count) AS word_count_sum
+        --AVG(b.mean_word_count) AS window_avg
+    FROM word_counts a
     CROSS JOIN window_sizes w
+    JOIN word_counts b
+        ON b.id BETWEEN a.id - (w.size - 1) AND a.id + (w.size - 1)
+        AND a.word = b.word
+    GROUP BY a.id, w.size, b.word
 ),
 
--- 6. Flag rows that exceed threshold in ANY window size
+-- Mean word count per row (your original logic)
+aggregated AS (
+    SELECT
+        id,
+        window_size,
+        AVG(word_count_sum) AS mean_word_count
+    FROM windowed
+    GROUP BY id, window_size
+    HAVING mean_word_count > 2
+)
+--SELECT * FROM aggregated a JOIN transcription t ON a.id = t.id
+,
+
+-- Flag rows that exceed threshold in ANY window size
 flagged AS (
     SELECT DISTINCT id
-    FROM windowed
-    WHERE window_avg > 2  -- threshold: tune as needed
+    FROM aggregated
+    WHERE mean_word_count > 2  -- threshold: tune as needed
 ),
 
--- 7. Add lag to detect contiguous ranges
+-- Add lag to detect contiguous ranges
 lagged AS (
     SELECT
         f.id,
@@ -73,7 +81,7 @@ lagged AS (
     FROM flagged f
 ),
 
--- 8. Group contiguous flagged rows into ranges
+-- Group contiguous flagged rows into ranges
 grouped AS (
     SELECT
         id,
@@ -84,7 +92,7 @@ grouped AS (
     FROM lagged
 )
 
--- 9. Join back to transcription to get full range info
+-- Join back to transcription to get full range info
 SELECT 
     t.attempt_id,
     g.group_id,
@@ -93,10 +101,10 @@ SELECT
     MIN(t.from_offset) AS min_from_offset,
     MAX(t.to_offset) AS max_to_offset,
     COUNT(*) AS row_count,
-    GROUP_CONCAT(t.text, ' || ') AS combined_text
+    GROUP_CONCAT(t.text, ' || ') AS text
+
 FROM grouped g
 JOIN transcription t ON g.id = t.id
 GROUP BY t.attempt_id, g.group_id
 HAVING max_to_offset - min_from_offset > 0
 ORDER BY min_id
-;
