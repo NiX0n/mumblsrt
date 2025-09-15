@@ -1,117 +1,161 @@
 WITH RECURSIVE
--- Tokenize text into words
-split_words(id, word, rest) AS (
+-- Tokenize text into words (consider normalizing)
+split_words(id, attempt_id, raw_word, rest) AS (
     SELECT
         id,
-        SUBSTR(text, 1, INSTR(text || ' ', ' ') - 1),
-        SUBSTR(text, INSTR(text || ' ', ' ') + 1)
+        attempt_id,
+        SUBSTR(text, 1, INSTR(text || ' ', ' ') - 1) AS raw_word,
+        SUBSTR(text, INSTR(text || ' ', ' ') + 1)     AS rest
     FROM transcription
-    WHERE attempt_id <> 1
-    --WHERE 
-    --    LENGTH(text) > 0x20
+    WHERE 
         -- Ignoring this for testing
-        --AND attempt_id IN(:attemptId)
+        attempt_id IN(:attemptId)
+        --attempt_id <> 1
+        --LENGTH(text) > 0x20
+
     
     UNION ALL
-
+    
     SELECT
         id,
+        attempt_id,
         SUBSTR(rest, 1, INSTR(rest || ' ', ' ') - 1),
         SUBSTR(rest, INSTR(rest || ' ', ' ') + 1)
     FROM split_words
     WHERE rest <> ''
 ),
 
+-- Normalize words (lowercase, strip simple punctuation). Extend as needed.
+norm_words AS (
+    SELECT
+        id,
+        attempt_id,
+        LOWER(
+          REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(raw_word,
+            '.', ''), ',', ''), '!', ''), '?', ''), ';', ''), ':', '')
+        ) AS word
+    FROM split_words
+    WHERE raw_word <> ''
+),
+
 -- Count repeats of each word per row
 word_counts AS (
     SELECT
         id,
+        attempt_id,
         word,
         COUNT(*) AS word_count
-    FROM split_words
+    FROM norm_words
     WHERE word <> ''
-    GROUP BY id, word
+    GROUP BY id, attempt_id, word
 ),
 
--- Define the window sizes you want to check
+-- Window sizes to test
 window_sizes(size) AS (
-    VALUES (1), (2), (3)  -- tune as needed
+    VALUES (1), (2), (3), (5)
 ),
 
--- For each window size, compute sliding sum of word_count
-windowed AS (
+-- Centers and fixed window bounds (do NOT vary per word)
+centers AS (
+    SELECT DISTINCT
+        wc.id,
+        wc.attempt_id
+    FROM word_counts wc
+),
+
+bounds AS (
     SELECT
-        a.id,
+        c.attempt_id,
+        c.id AS center_id,
         w.size AS window_size,
-        b.word,
-        MIN(b.id) min_id,
-        MAX(b.id) max_id,
-        SUM(b.word_count) AS word_count_sum
-        --AVG(b.mean_word_count) AS window_avg
-    FROM word_counts a
+        c.id - (w.size - 1) AS min_id,
+        c.id + (w.size - 1) AS max_id
+    FROM centers c
     CROSS JOIN window_sizes w
-    JOIN word_counts b
-        ON b.id BETWEEN a.id - (w.size - 1) AND a.id + (w.size - 1)
-    GROUP BY a.id, w.size, b.word
 ),
 
--- Mean word count per row (your original logic)
+-- Sum counts per distinct word within each fixed window
+window_vocab AS (
+    SELECT
+        b.attempt_id,
+        b.center_id AS id,
+        b.window_size,
+        b.min_id,
+        b.max_id,
+        wc.word,
+        SUM(wc.word_count) AS word_count_sum
+    FROM bounds b
+    JOIN word_counts wc
+      ON wc.attempt_id = b.attempt_id
+     AND wc.id BETWEEN b.min_id AND b.max_id
+    GROUP BY b.attempt_id, b.center_id, b.window_size, b.min_id, b.max_id, wc.word
+),
+
+-- Optional: filter out very common stopwords to reduce noise
+-- stopworded AS (
+--   SELECT * FROM window_vocab
+--   WHERE word NOT IN ('the','to','a','of','and','in','is','it','for','on','that','with','as')
+-- ),
+
+--  Average across all distinct words in the fixed window
 aggregated AS (
     SELECT
-       	id,
+        attempt_id,
+        id,
         window_size,
         min_id,
         max_id,
-    	--*,
-        AVG(word_count_sum) AS mean_word_count
-    FROM windowed
-    GROUP BY id, window_size, min_id, max_id
+        AVG(word_count_sum) AS mean_word_count,
+        COUNT(*)            AS distinct_words_in_window,
+        SUM(word_count_sum) AS total_counts_in_window
+    FROM window_vocab
+    -- FROM stopworded
+    GROUP BY attempt_id, id, window_size, min_id, max_id
     HAVING mean_word_count > 2
-)
-SELECT * FROM aggregated a JOIN transcription t ON t.id BETWEEN a.min_id AND a.max_id
-,
-
--- Flag rows that exceed threshold in ANY window size
-flagged AS (
-    SELECT DISTINCT 
-    	t.id
-    FROM aggregated a
-    INNER JOIN transcription t
-    	ON t.id BETWEEN a.min_id AND a.max_id
 ),
 
--- Add lag to detect contiguous ranges
+-- Flag all rows within the suspect windows
+flagged AS (
+    SELECT DISTINCT
+        a.attempt_id,
+        t.id
+    FROM aggregated a
+    JOIN transcription t
+      ON t.attempt_id = a.attempt_id
+     AND t.id BETWEEN a.min_id AND a.max_id
+),
+
+-- Group contiguous flagged rows per attempt
 lagged AS (
     SELECT
-        f.id,
-        LAG(f.id) OVER (ORDER BY f.id) AS prev_id
-    FROM flagged f
+        attempt_id,
+        id,
+        LAG(id) OVER (PARTITION BY attempt_id ORDER BY id) AS prev_id
+    FROM flagged
 ),
-
--- Group contiguous flagged rows into ranges
 grouped AS (
     SELECT
+        attempt_id,
         id,
-        SUM(CASE
-            WHEN prev_id IS NULL OR id <> prev_id + 1
-            THEN 1 ELSE 0
-        END) OVER (ORDER BY id) AS group_id
+        SUM(CASE WHEN prev_id IS NULL OR id <> prev_id + 1 THEN 1 ELSE 0 END)
+            OVER (PARTITION BY attempt_id ORDER BY id) AS group_id
     FROM lagged
 )
 
--- Join back to transcription to get full range info
-SELECT 
+-- Return full ranges
+SELECT
     t.attempt_id,
     g.group_id,
     MIN(g.id) AS min_id,
     MAX(g.id) AS max_id,
     MIN(t.from_offset) AS min_from_offset,
-    MAX(t.to_offset) AS max_to_offset,
+    MAX(t.to_offset)   AS max_to_offset,
     COUNT(*) AS row_count,
     GROUP_CONCAT(t.text, ' || ') AS text
-
 FROM grouped g
-INNER JOIN transcription t ON g.id = t.id
+JOIN transcription t
+  ON t.attempt_id = g.attempt_id
+ AND t.id = g.id
 GROUP BY t.attempt_id, g.group_id
 HAVING max_to_offset - min_from_offset > 0
 ORDER BY min_id
