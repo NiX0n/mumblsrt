@@ -5,7 +5,7 @@ suspects AS (
     FROM transcription
     WHERE 
         is_suspect <> 0
-        --AND attempt_id IN(:attemptId)
+        AND attempt_id IN(:attemptId)
 
 ),
 lagged AS (
