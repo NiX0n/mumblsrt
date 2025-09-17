@@ -1,6 +1,6 @@
 'use strict';
 const 
-    TranscriptionAttempt = require('./model/TranscriptionAttempt'),
+    TranscriptionAttempt = require('../model/TranscriptionAttempt'),
     {camelCase, snakeCase} = require('change-case')
 ;
 /**

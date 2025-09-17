@@ -19,9 +19,9 @@ const
     promotFile = `${wd}/prompt.txt`,
     MAX_RECURSION = 7,
     {camelCase, snakeCase} = require('change-case/keys'),
-    TranscriptionAttempt = require('./sql/model/TranscriptionAttempt'),
-    Transcription = require('./sql/model/Transcription'),
-    TranscriptionRange = require('./sql/model/TranscriptionRange')
+    TranscriptionAttempt = require('./db/model/TranscriptionAttempt'),
+    Transcription = require('./db/model/Transcription'),
+    TranscriptionRange = require('./db/model/TranscriptionRange')
 ;
 let 
     isDbInit = dbPath.startsWith(':') ? false : fs.existsSync(dbPath),
@@ -184,8 +184,8 @@ function initDb(db)
 {
     log('Initializing database');
     [
-        `${__dirname}/sql/CREATE_TABLE_transcription_attempt.sql`,
-        `${__dirname}/sql/CREATE_TABLE_transcription.sql`,
+        `${__dirname}/db/sql/CREATE_TABLE_transcription_attempt.sql`,
+        `${__dirname}/db/sql/CREATE_TABLE_transcription.sql`,
     ].forEach(sqlFile => {
         db.exec(fs.readFileSync(sqlFile, enc));
     });
@@ -199,7 +199,7 @@ function insertAttempt(attempt)
 {
     log("INSERTING attempt");
     const 
-        {sql, parameters} = require('./sql/INSERT_INTO_transcription_attempt.sql')(attempt),
+        {sql, parameters} = require('./db/sql/INSERT_INTO_transcription_attempt.sql')(attempt),
         stmt = db.prepare(sql)
     ;
     const row = stmt.get(parameters);
@@ -223,7 +223,7 @@ function insertTranscriptions(transcriptions)
     transcriptions.forEach(transcription => {
         //log("INSERTING transcription: ", transcription);
         const 
-            {sql, parameters} = require('./sql/INSERT_INTO_transcription.sql')(transcription),
+            {sql, parameters} = require('./db/sql/INSERT_INTO_transcription.sql')(transcription),
             stmt = db.prepare(sql),
             row = stmt.get(parameters)
         ;
@@ -250,7 +250,7 @@ function insertTranscriptions(transcriptions)
 function updateTranscriptions(changes, conds)
 {
     const 
-        {sql, parameters} = require('./sql/UPDATE_transcription.sql')(changes, conds),
+        {sql, parameters} = require('./db/sql/UPDATE_transcription.sql')(changes, conds),
         stmt = db.prepare(sql)
     ;
     log("UPDATING transcriptions", parameters);
@@ -270,7 +270,7 @@ function updateTranscriptions(changes, conds)
 function fetchAttempt(attemptConds)
 {
     const 
-        {sql, parameters} = require('./sql/SELECT_FROM_traanscripion_attempt.sql')(attemptConds),
+        {sql, parameters} = require('./db/sql/SELECT_FROM_traanscripion_attempt.sql')(attemptConds),
         stmt = db.prepare(sql)
     ;
     //log(sql, parameters);
@@ -286,7 +286,7 @@ function fetchAttempt(attemptConds)
 function fetchTranscriptions(conds)
 {
     const 
-        {sql, parameters} = require('./sql/SELECT_FROM_transcription.sql')(conds),
+        {sql, parameters} = require('./db/sql/SELECT_FROM_transcription.sql')(conds),
         stmt = db.prepare(sql)
     ;
     const rows = stmt.all(parameters);
@@ -301,7 +301,7 @@ function fetchTranscriptions(conds)
 function fetchMergedTranscriptions(conds)
 {
     const
-        sql = require('./sql/SELECT_merged_FROM_transcription.sql'),
+        sql = require('./db/sql/SELECT_merged_FROM_transcription.sql'),
         parameters = {file: conds.file},
         stmt = db.prepare(sql)
     ;
@@ -317,7 +317,7 @@ function fetchMergedTranscriptions(conds)
 function hasTranscriptions(attempt)
 {
     const 
-        sql = fs.readFileSync(`${__dirname}/sql/SELECT_COUNT_FROM_transcription.sql`, enc),
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_COUNT_FROM_transcription.sql`, enc),
         stmt = db.prepare(sql)
     ;
     return !!stmt.get({attemptId: attempt.id})?.count;
@@ -331,7 +331,7 @@ function hasTranscriptions(attempt)
 function fetchTranscriptionStutter(attempt)
 {
     const 
-        sql = fs.readFileSync(`${__dirname}/sql/SELECT_windowed_stutter_FROM_transcription.sql`, enc),
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_windowed_stutter_FROM_transcription.sql`, enc),
         stmt = db.prepare(sql)
     ;
     return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionRange(row, true));
@@ -344,7 +344,7 @@ function fetchTranscriptionStutter(attempt)
 function fetchInterTranscriptionStutter(attempt)
 {
     const 
-        sql = fs.readFileSync(`${__dirname}/sql/SELECT_stutter_FROM_transcription.sql`, enc),
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_stutter_FROM_transcription.sql`, enc),
         stmt = db.prepare(sql)
     ;
     return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionRange(row, true));
@@ -357,7 +357,7 @@ function fetchInterTranscriptionStutter(attempt)
 function fetchIntraTranscriptionStutter(attempt)
 {
     const 
-        sql = fs.readFileSync(`${__dirname}/sql/SELECT_intrastutter_FROM_transcription.sql`, enc),
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_intrastutter_FROM_transcription.sql`, enc),
         parameters = {attemptId: attempt.id}, 
         stmt = db.prepare(sql)
     ;
@@ -372,7 +372,7 @@ function fetchIntraTranscriptionStutter(attempt)
 function fetchZeroLengthTranscriptions(attempt)
 {
     const 
-        sql = fs.readFileSync(`${__dirname}/sql/SELECT_zerolens_FROM_transcription.sql`, enc),
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_zerolens_FROM_transcription.sql`, enc),
         parameters = {attemptId: attempt.id}, 
         stmt = db.prepare(sql)
     ;
@@ -386,7 +386,7 @@ function fetchZeroLengthTranscriptions(attempt)
 function fetchSuspectTranscriptions(attempt)
 {
     const 
-        sql = fs.readFileSync(`${__dirname}/sql/SELECT_suspect_ranges_FROM_transcription.sql`, enc),
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_suspect_ranges_FROM_transcription.sql`, enc),
         parameters = {attemptId: attempt.id}, 
         stmt = db.prepare(sql)
     ;
