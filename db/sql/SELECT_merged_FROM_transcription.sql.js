@@ -1,5 +1,5 @@
 const 
-    Transcription = require('./model/Transcription'),
+    Transcription = require('../model/Transcription'),
     {columnNames} = Transcription
 ;
 module.exports = `SELECT 

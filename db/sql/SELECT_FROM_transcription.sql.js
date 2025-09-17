@@ -1,6 +1,6 @@
 'use strict';
 const 
-    Transcription = require('./model/Transcription'),
+    Transcription = require('../model/Transcription'),
     {camelCase, snakeCase} = require('change-case'),
     {columnNames} = Transcription
 ;
