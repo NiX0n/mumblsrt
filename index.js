@@ -14,7 +14,8 @@ const
         `${wd}/db.sqlite3`,
     file = process.argv[process.argv.length - 1],
     // @TODO make these paramters into this script
-    srtFile = `${file}.srt`,
+    srtFile =  path.resolve(`${file}.srt`),
+    //srtFile =  path.resolve(`${wd}/output.srt`),
     promotFile = `${wd}/prompt.txt`,
     MAX_RECURSION = 7,
     {camelCase, snakeCase} = require('change-case/keys'),
@@ -93,8 +94,8 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
             ar: 16000
         },
         cliArgs = {
-            p: 4,
-            t: 5,
+            //p: 4,
+            t: 20,
             bo: 7,
             bs: 7,
             nf: null,
@@ -322,6 +323,20 @@ function hasTranscriptions(attempt)
     return !!stmt.get({attemptId: attempt.id})?.count;
 }
 
+
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {Array<TranscriptionRange>}
+ */
+function fetchTranscriptionStutter(attempt)
+{
+    const 
+        sql = fs.readFileSync(`${__dirname}/sql/SELECT_windowed_stutter_FROM_transcription.sql`, enc),
+        stmt = db.prepare(sql)
+    ;
+    return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionRange(row, true));
+}
+
 /**
  * @param {TranscriptionAttempt} attempt 
  * @returns {Array<TranscriptionRange>}
@@ -479,7 +494,7 @@ function flagRangeSuspect(ranges)
         return;
     }
 
-    const interStutterings = fetchInterTranscriptionStutter(attempt);
+    /*const interStutterings = fetchInterTranscriptionStutter(attempt);
     if(!interStutterings?.length)
     {
         log("No inter-transcription stuttering in this attempt");
@@ -499,6 +514,17 @@ function flagRangeSuspect(ranges)
     {
         log('Intra-transcriptin stuttering found:', infraStutterings.length);
         flagRangeSuspect(infraStutterings);
+    }*/
+    
+    const stutterings = fetchTranscriptionStutter(attempt);
+    if(!stutterings?.length)
+    {
+        log("No inter-transcription stuttering in this attempt");
+    }
+    else
+    {
+        log('Transcriptin stuttering found:', stutterings.length);
+        flagRangeSuspect(stutterings);
     }
 
     const zeroLens = fetchZeroLengthTranscriptions(attempt);
@@ -534,13 +560,14 @@ function flagRangeSuspect(ranges)
     };
 
     // Is this the base run of main()?
-    if(!attempt.parentId)
+    if(!attempt?.parentId)
     {
         // Render the merged transcriptions from all the attempts
         const 
             transcriptions = fetchMergedTranscriptions(attempt),
             srt = require('./srt')(transcriptions)
         ;
+        log(`Writing to srt file:`, srtFile);
         fs.writeFileSync(srtFile, srt, enc);
         log(`Successfully generated srt file:`, srtFile);
         log('Runtime (secs):', process.uptime());
