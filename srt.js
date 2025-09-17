@@ -1,6 +1,6 @@
 'use strict';
 const 
-    Transcription = require('./sql/model/Transcription'),
+    Transcription = require('./db/model/Transcription'),
     HOURS = 1000 * 60 * 60,
     MINUTES = 1000 * 60,
     SECONDS = 1000,
