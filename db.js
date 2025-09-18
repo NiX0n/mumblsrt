@@ -36,7 +36,7 @@ function isDbInit()
  * 
  * @param {DatabaseSync} db 
  */
-function initDb(db)
+function initDb()
 {
     log('Initializing database');
     [
@@ -252,6 +252,7 @@ function fetchSuspectTranscriptions(attempt)
 
 module.exports = {
     isDbInit,
+    initDb,
     getDb,
     insertAttempt,
     insertTranscriptions,
@@ -261,5 +262,6 @@ module.exports = {
     hasTranscriptions,
     fetchTranscriptionStutter,
     fetchZeroLengthTranscriptions,
-    fetchSuspectTranscriptions
+    fetchSuspectTranscriptions,
+    fetchMergedTranscriptions
 };
