@@ -6,12 +6,9 @@ const
     fs = require('fs'),
     path = require("node:path"),
     enc = {encoding: 'utf8'},
-    wd = `${__dirname}/tmp` || fs.mkdtempSync(),
+    cfg = require('./config'),
+    {wd} = cfg,
     crypto = require('crypto'),
-    {DatabaseSync} = require('node:sqlite'),
-    dbPath = 
-        //':memory:' || 
-        `${wd}/db.sqlite3`,
     file = process.argv[process.argv.length - 1],
     // @TODO make these paramters into this script
     srtFile =  path.resolve(`${file}.srt`),
@@ -19,15 +16,11 @@ const
     promotFile = `${wd}/prompt.txt`,
     MAX_RECURSION = 7,
     {camelCase, snakeCase} = require('change-case/keys'),
+    db = require('./db'),
     TranscriptionAttempt = require('./db/model/TranscriptionAttempt'),
     Transcription = require('./db/model/Transcription'),
     TranscriptionRange = require('./db/model/TranscriptionRange')
 ;
-let 
-    isDbInit = dbPath.startsWith(':') ? false : fs.existsSync(dbPath),
-    db = new DatabaseSync(dbPath)
-;
-
 
 /**
  * 
@@ -177,224 +170,6 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
 });/*new Promise()*/}
 
 /**
- * 
- * @param {DatabaseSync} db 
- */
-function initDb(db)
-{
-    log('Initializing database');
-    [
-        `${__dirname}/db/sql/CREATE_TABLE_transcription_attempt.sql`,
-        `${__dirname}/db/sql/CREATE_TABLE_transcription.sql`,
-    ].forEach(sqlFile => {
-        db.exec(fs.readFileSync(sqlFile, enc));
-    });
-}
-
-/**
- * @param {TranscriptionAttempt|object} attempt
- * @returns {TranscriptionAttempt}
- */
-function insertAttempt(attempt)
-{
-    log("INSERTING attempt");
-    const 
-        {sql, parameters} = require('./db/sql/INSERT_INTO_transcription_attempt.sql')(attempt),
-        stmt = db.prepare(sql)
-    ;
-    const row = stmt.get(parameters);
-    log("INSERTED attempt", attempt);
-    return row && new TranscriptionAttempt(row, true);
-}
-
-
-/**
- * 
- * @param {Array<Transcription>} transcription 
- * @returns {Array<Transcription>}
- */
-function insertTranscriptions(transcriptions)
-{
-    log("INSERTING transcriptions");
-    const 
-        inserted = []
-    ;
-
-    transcriptions.forEach(transcription => {
-        //log("INSERTING transcription: ", transcription);
-        const 
-            {sql, parameters} = require('./db/sql/INSERT_INTO_transcription.sql')(transcription),
-            stmt = db.prepare(sql),
-            row = stmt.get(parameters)
-        ;
-        if(!row) { return; }
-        if(transcription instanceof Transcription)
-        {
-            transcription.assign(row, true);
-            inserted.push(transcription);
-        }
-        else
-        {
-            inserted.push(new Transcription(row, true));
-        }
-        
-        log("INSERTED transcription:", transcription);
-    });
-    return inserted;
-}
-
-/**
- * @param {TranscriptionAttempt|object} transcription
- * @returns void
- */
-function updateTranscriptions(changes, conds)
-{
-    const 
-        {sql, parameters} = require('./db/sql/UPDATE_transcription.sql')(changes, conds),
-        stmt = db.prepare(sql)
-    ;
-    log("UPDATING transcriptions", parameters);
-    
-    const rows = stmt.all(parameters);
-    log("UPDATED transcriptions", rows.length);
-    // TODO return something meaningful
-    return true;
-}
-
-
-/**
- * 
- * @param {TranscriptionAttempt|object} attemptConds
- * @returns {TranscriptionAttempt|undefined}
- */
-function fetchAttempt(attemptConds)
-{
-    const 
-        {sql, parameters} = require('./db/sql/SELECT_FROM_traanscripion_attempt.sql')(attemptConds),
-        stmt = db.prepare(sql)
-    ;
-    //log(sql, parameters);
-    const row = stmt.get(parameters);
-    return row && new TranscriptionAttempt(row, true);
-}
-
-/**
- * 
- * @param {Transcription|object} conds
- * @returns {Array<Transcription>}
- */
-function fetchTranscriptions(conds)
-{
-    const 
-        {sql, parameters} = require('./db/sql/SELECT_FROM_transcription.sql')(conds),
-        stmt = db.prepare(sql)
-    ;
-    const rows = stmt.all(parameters);
-    return rows?.length && rows.map(row => new Transcription(row, true));
-}
-
-/**
- * 
- * @param {Transcription|object} conds
- * @returns {Array<Transcription>}
- */
-function fetchMergedTranscriptions(conds)
-{
-    const
-        sql = require('./db/sql/SELECT_merged_FROM_transcription.sql'),
-        parameters = {file: conds.file},
-        stmt = db.prepare(sql)
-    ;
-    const rows = stmt.all(parameters);
-    //log(rows); process.exit();
-    return rows?.length && rows.map(row => new Transcription(row, true));
-}
-
-/**
- * @param {TranscriptionAttempt} attempt 
- * @returns {boolean}
- */
-function hasTranscriptions(attempt)
-{
-    const 
-        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_COUNT_FROM_transcription.sql`, enc),
-        stmt = db.prepare(sql)
-    ;
-    return !!stmt.get({attemptId: attempt.id})?.count;
-}
-
-
-/**
- * @param {TranscriptionAttempt} attempt 
- * @returns {Array<TranscriptionRange>}
- */
-function fetchTranscriptionStutter(attempt)
-{
-    const 
-        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_windowed_stutter_FROM_transcription.sql`, enc),
-        stmt = db.prepare(sql)
-    ;
-    return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionRange(row, true));
-}
-
-/**
- * @param {TranscriptionAttempt} attempt 
- * @returns {Array<TranscriptionRange>}
- */
-function fetchInterTranscriptionStutter(attempt)
-{
-    const 
-        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_stutter_FROM_transcription.sql`, enc),
-        stmt = db.prepare(sql)
-    ;
-    return stmt.all({attemptId: attempt.id}).map(row => new TranscriptionRange(row, true));
-}
-
-/**
- * @param {TranscriptionAttempt} attempt 
- * @returns {Array<TranscriptionRange>}
- */
-function fetchIntraTranscriptionStutter(attempt)
-{
-    const 
-        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_intrastutter_FROM_transcription.sql`, enc),
-        parameters = {attemptId: attempt.id}, 
-        stmt = db.prepare(sql)
-    ;
-    return stmt.all(parameters).map(row => new TranscriptionRange(row, true));
-}
-
-
-/**
- * @param {TranscriptionAttempt} attempt 
- * @returns {Array<TranscriptionRange>}
- */
-function fetchZeroLengthTranscriptions(attempt)
-{
-    const 
-        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_zerolens_FROM_transcription.sql`, enc),
-        parameters = {attemptId: attempt.id}, 
-        stmt = db.prepare(sql)
-    ;
-    return stmt.all(parameters).map(row => new TranscriptionRange(row, true));
-}
-
-/**
- * @param {TranscriptionAttempt} attempt 
- * @returns {Array<TranscriptionRange>}
- */
-function fetchSuspectTranscriptions(attempt)
-{
-    const 
-        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_suspect_ranges_FROM_transcription.sql`, enc),
-        parameters = {attemptId: attempt.id}, 
-        stmt = db.prepare(sql)
-    ;
-    return stmt.all(parameters).map(row => new TranscriptionRange(row, true));
-}
-
-
-/**
  * @param {TranscriptionAttempt} attempt 
  */
 function attemptJsonFilename(attempt)
@@ -412,16 +187,16 @@ function parseAndInsertTranscriptionJson(attempt)
         /**
          * @type {Array<Transcription>}
          */
-        transcriptions = data.transcription.map(t => { return new Transcription ({ 
+        transcriptions = data.transcription.map(t => new Transcription ({ 
             attemptId: attempt.id,
             fromOffset: t.offsets.from,
             toOffset: t.offsets.to,
             text: t.text,
             tokens: JSON.stringify(t.tokens)
-        });})
+        }))
     ;
-
-    insertTranscriptions(transcriptions);
+    
+    db.insertTranscriptions(transcriptions);
 }
 
 /**
@@ -433,7 +208,7 @@ function flagRangeSuspect(ranges)
     {
         log('Suspect transcription range updating:', range);
         // Flag range
-        updateTranscriptions({
+        db.updateTranscriptions({
             isSuspect: 1
         }, {
             id: {min: range.minId, max: range.maxId}
@@ -455,29 +230,28 @@ function flagRangeSuspect(ranges)
 
     log("Beginning attempt at depth:", main._depth);
 
-    if(!isDbInit)
+    if(!db.isDbInit())
     {
-        initDb(db);
-        isDbInit = true;
+        db.initDb();
     }
 
     // If no attempt passed (base recursion run)
     // Or our passed attempt hasn't found yet
     if(!attempt?.id)
     {
-        attempt = fetchAttempt(attempt || {file}) || attempt;
+        attempt = db.fetchAttempt(attempt || {file}) || attempt;
     }
 
     // If we've never run against this file before
     if(!attempt?.id)
     {
-        attempt = insertAttempt(attempt || {file: file});
+        attempt = db.insertAttempt(attempt || {file: file});
     }
 
     log('Attempt:', attempt);
     //if(attempt?.parentId) { log('recursion over'); return; }
 
-    if(!hasTranscriptions(attempt))
+    if(!db.hasTranscriptions(attempt))
     {
         if(!fs.existsSync(attemptJsonFilename(attempt)))
         {
@@ -493,30 +267,8 @@ function flagRangeSuspect(ranges)
         // Reurning early is OK, because rendering SRT only happens on base recursion run
         return;
     }
-
-    /*const interStutterings = fetchInterTranscriptionStutter(attempt);
-    if(!interStutterings?.length)
-    {
-        log("No inter-transcription stuttering in this attempt");
-    }
-    else
-    {
-        log('Inter-transcriptin stuttering found:', interStutterings.length);
-        flagRangeSuspect(interStutterings);
-    }
-
-    const infraStutterings = fetchIntraTranscriptionStutter(attempt);
-    if(!infraStutterings?.length)
-    {
-        log("No intra-transcription stuttering in this attempt");
-    }
-    else
-    {
-        log('Intra-transcriptin stuttering found:', infraStutterings.length);
-        flagRangeSuspect(infraStutterings);
-    }*/
     
-    const stutterings = fetchTranscriptionStutter(attempt);
+    const stutterings = db.fetchTranscriptionStutter(attempt);
     if(!stutterings?.length)
     {
         log("No inter-transcription stuttering in this attempt");
@@ -527,19 +279,19 @@ function flagRangeSuspect(ranges)
         flagRangeSuspect(stutterings);
     }
 
-    const zeroLens = fetchZeroLengthTranscriptions(attempt);
+    const zeroLens = db.fetchZeroLengthTranscriptions(attempt);
     if(zeroLens.length)
     {
         log('Zero length transcription ranges found:', zeroLens.length);
         flagRangeSuspect(zeroLens);
     }
 
-    const suspects = fetchSuspectTranscriptions(attempt);
+    const suspects = db.fetchSuspectTranscriptions(attempt);
     for(const suspect of suspects)
     {
         log('Suspect found:', suspect);
         // De-Activate stuttering transcriptions
-        updateTranscriptions({
+        db.updateTranscriptions({
             isActive: 0
         }, {
             id: {min: suspect.minId, max: suspect.maxId}
@@ -564,7 +316,7 @@ function flagRangeSuspect(ranges)
     {
         // Render the merged transcriptions from all the attempts
         const 
-            transcriptions = fetchMergedTranscriptions(attempt),
+            transcriptions = db.fetchMergedTranscriptions(attempt),
             srt = require('./srt')(transcriptions)
         ;
         log(`Writing to srt file:`, srtFile);
