@@ -156,13 +156,13 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
     log('Executing:', cmd);
     const child = exec(cmd, execOptions);
 
-    child.stdout.on('data', log);
-    child.stderr.on('data', error);
+    child.stdout.on('data', (data) => process.stdout.write(data));
+    child.stderr.on('data', (data) => process.stderr.write(data));
     child.on('error', rej);
     child.on('close', (code) => {
         if(!code)
         {
-            res(true);
+            res();
         }
         rej(`ffmpeg/whisper-cli process exited with code ${code}`);
     });
