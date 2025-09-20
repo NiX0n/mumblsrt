@@ -1,11 +1,13 @@
 WITH RECURSIVE
 -- Tokenize text into words (consider normalizing)
-split_words(id, attempt_id, raw_word, rest) AS (
+split_words(id, attempt_id, word, rest) AS (
     SELECT
         id,
         attempt_id,
-        SUBSTR(text, 1, INSTR(text || ' ', ' ') - 1) AS raw_word,
-        SUBSTR(text, INSTR(text || ' ', ' ') + 1)     AS rest
+        -- Find strings delimited by space
+        -- Normalize w/ LOWER() insofar as accurate counts of caseless words and symbols
+        LOWER(SUBSTR(text, 1, INSTR(text || ' ', ' ') - 1)) AS word,
+        LOWER(SUBSTR(text, INSTR(text || ' ', ' ') + 1))     AS rest
     FROM transcription
     WHERE 
         -- Ignoring this for testing
@@ -26,17 +28,18 @@ split_words(id, attempt_id, raw_word, rest) AS (
 ),
 
 -- Normalize words (lowercase, strip simple punctuation). Extend as needed.
-norm_words AS (
-    SELECT
-        id,
-        attempt_id,
-        LOWER(
-          REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(raw_word,
-            '.', ''), ',', ''), '!', ''), '?', ''), ';', ''), ':', '')
-        ) AS word
-    FROM split_words
-    WHERE raw_word <> ''
-),
+-- We aren't normalizing like this because odd symbols can stutter too, and should be considered
+-- norm_words AS (
+--     SELECT
+--         id,
+--         attempt_id,
+--         LOWER(
+--           REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(raw_word,
+--             '.', ''), ',', ''), '!', ''), '?', ''), ';', ''), ':', '')
+--         ) AS word
+--     FROM split_words
+--     WHERE raw_word <> ''
+-- ),
 
 -- Count repeats of each word per row
 word_counts AS (
@@ -45,7 +48,7 @@ word_counts AS (
         attempt_id,
         word,
         COUNT(*) AS word_count
-    FROM norm_words
+    FROM split_words
     WHERE word <> ''
     GROUP BY id, attempt_id, word
 ),
