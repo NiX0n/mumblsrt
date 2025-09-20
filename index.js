@@ -1,28 +1,43 @@
 'use strict';
 const 
+    // Make log() and error() convenient
     {log, error} = console,
+    // Use a tried and true Promise implmentatino
     Promise = require('bluebird'),
-    {exec, execSync, spawn} = require('node:child_process'),
+    // For executing our ffmpeg/whisper calls
+    {exec} = require('node:child_process'),
+    // File System
     fs = require('fs'),
     path = require("node:path"),
     enc = {encoding: 'utf8'},
-    cfg = require('./config'),
-    {wd} = cfg,
+    // For generating string hashes
     crypto = require('crypto'),
-    file = path.resolve(process.argv[process.argv.length - 1]),
-    srtFile =  path.resolve(cfg.scribe?.srtFileTransform?.(file) || `${file}.srt`),
-    //srtFile =  path.resolve(`${wd}/output.srt`),
-    promotFile = cfg.scribe?.promotFile || `${wd}/prompt.txt`,
-    MAX_RECURSION = 9,
     {camelCase, snakeCase} = require('change-case/keys'),
+    // Configuration
+    cfg = require('./config'),
+    // Working Directory
+    {wd} = cfg,
+    // Our SQLite database helper
     db = require('./db'),
+    // Our databas models
     TranscriptionAttempt = require('./db/model/TranscriptionAttempt'),
     Transcription = require('./db/model/Transcription'),
-    TranscriptionRange = require('./db/model/TranscriptionRange')
+    TranscriptionRange = require('./db/model/TranscriptionRange'),
+    // Input video/audio filename
+    file = path.resolve(process.argv[process.argv.length - 1]),
+    // Output subtitle filename
+    srtFile =  path.resolve(cfg.scribe?.srtFileTransform?.(file) || `${file}.srt`),
+    //srtFile =  path.resolve(`${wd}/output.srt`),
+    // Optional input prompt filename
+    promotFile = cfg.scribe?.promotFile || `${wd}/prompt.txt`,
+    // Maximum depth main() is allowed to recurse.
+    // Notice: there is no limit on breadth of attempts.
+    MAX_RECURSION = cfg.maxRecursion || 9
 ;
 
 /**
- * 
+ * Transform object key/value pairs into 
+ * CLI arguments to ffmpeg and whisper
  * @param {object} args 
  */
 function objToArgs(args)
@@ -55,6 +70,7 @@ function objToArgs(args)
 
 
 /**
+ * Normalize wav filename so it's unique and human readable
  * @param {TranscriptionAttempt} attempt 
  */
 function wavFilename(attempt)
@@ -67,44 +83,73 @@ function wavFilename(attempt)
 }
 
 /**
- * 
+ * Run the necessary chain of commands to generate an attempt JSON file.
+ * Using source file, ffmpeg, tee, and whisper.
  * @param {TranscriptionAttempt} attempt 
- * @param {object} options 
+ * @param {object} options
  * @returns {Promise<void>} resolves on success
  * @throws {Error} and rejects on failure
  */
 function transcribe(attempt, options = {}) { return new Promise((res, rej) => 
 {
     const 
+        // Note About Larger models 
+        // - They tend to do better at guessing the right words.
+        // - They do run slower than the smaller ones.
+        // - They don't get better at avoiding stuttering much.
         model = options?.model || cfg.scribe?.model || './models/ggml-large-v3-turbo.bin',
+        // Instead of Whisper directly generating a srt file
+        // We have it generate a JSON file unique for this attempt
         attemptFile = attemptJsonFilename(attempt),
+        // Because it takes resources to convert a video file into wav,
+        // And because we potentially have to run numerous attempts,
+        // And because it may not be performant to access the source file;
+        // We cache a copy (with tee) in a wav file.
         wavFile = wavFilename(attempt),
         ffmpegArgs = {
+            // Start timestamp.  Default to beginning of file
+            // If we're recursing, use attempt ranges
             ss: Number.isInteger(attempt.startTime) ? attempt.startTime : undefined,
+            // End timestamp.  Default to end of file
             to: Number.isInteger(attempt.endTime) ? attempt.endTime : undefined,
+            // Out vidoe file input
             i: attempt.file,
+            // Output a wav container
             f: 'wav',
+            // Audio codec
             acodec: 'pcm_s16le',
+            // Whisper only cares about mono audio
             ac: 1,
+            // Whisper was trained at this sample rate
             ar: 16000
         },
         cliArgs = {
+            // # of processes/equal chunks Whisper will divide on its own
             p: null,
+            // # of threads to use per process
             t: 20,
+            // Best of. Keep odd
             bo: 7,
+            // Beam size
             bs: 7,
+            // Do not use temperature fallback while decoding 
             nf: true,
+            // No speech threshold
             nth: 0.20,
+            // maximum segment length in characters
             ml: 200,
             //tp: 0.05,
             m: model,
+            // Output a JSON file
             ojf: true,
             // whisper-cli will re-append this extension
             of: attemptFile.replace(/\.json$/i, '')
         },
+        // Be sure to include the cwd of whisper.cpp base dir
         execOptions = cfg.scribe.execOptions
     ;
 
+    // Prompt files allow certain behaviors to be passed in to all transcriptions.
     if(fs.existsSync(promotFile))
     {
         // notice that we're hacking --prompt into our shorter -scheme
@@ -123,6 +168,9 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
         }
     }
 
+    // Notice: we aren't checking the attempt state
+    // So as long as the cache file is present, we'll use it.
+    // Also Notice: This option can be overriden.
     if(
         typeof options?.i === 'undefined'
         && fs.existsSync(wavFile)
@@ -153,7 +201,7 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
 
     // Pipe it all together
     const cmd = cmdChain.join(' | ');
-    log('Executing:', cmd);
+    log('exec():', cmd);
     const child = exec(cmd, execOptions);
 
     child.stdout.on('data', (data) => process.stdout.write(data));
