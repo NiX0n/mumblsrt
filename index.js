@@ -9,12 +9,11 @@ const
     cfg = require('./config'),
     {wd} = cfg,
     crypto = require('crypto'),
-    file = process.argv[process.argv.length - 1],
-    // @TODO make these paramters into this script
-    srtFile =  path.resolve(`${file}.srt`),
+    file = path.resolve(process.argv[process.argv.length - 1]),
+    srtFile =  path.resolve(cfg.scribe?.srtFileTransform?.(file) || `${file}.srt`),
     //srtFile =  path.resolve(`${wd}/output.srt`),
-    promotFile = `${wd}/prompt.txt`,
-    MAX_RECURSION = 7,
+    promotFile = cfg.scribe?.promotFile || `${wd}/prompt.txt`,
+    MAX_RECURSION = 9,
     {camelCase, snakeCase} = require('change-case/keys'),
     db = require('./db'),
     TranscriptionAttempt = require('./db/model/TranscriptionAttempt'),
@@ -32,7 +31,10 @@ function objToArgs(args)
     for(const arg in args)
     {
         let value = args[arg];
-        if(typeof value === 'undefined')
+        if(
+            typeof value === 'undefined'
+            || value === null
+        )
         {
             continue;
         }
@@ -41,7 +43,7 @@ function objToArgs(args)
             // TODO Escape quotes
             value = '"'+value+'"';
         }
-        if(value === null)
+        if(value === true)
         {
             value = '';
         }
@@ -74,7 +76,7 @@ function wavFilename(attempt)
 function transcribe(attempt, options = {}) { return new Promise((res, rej) => 
 {
     const 
-        model = './models/ggml-large-v3-turbo.bin',
+        model = options?.model || cfg.scribe?.model || './models/ggml-large-v3-turbo.bin',
         attemptFile = attemptJsonFilename(attempt),
         wavFile = wavFilename(attempt),
         ffmpegArgs = {
@@ -87,22 +89,20 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
             ar: 16000
         },
         cliArgs = {
-            //p: 4,
+            p: null,
             t: 20,
             bo: 7,
             bs: 7,
-            nf: null,
+            nf: true,
             nth: 0.20,
             ml: 200,
             //tp: 0.05,
             m: model,
-            ojf: null,
+            ojf: true,
             // whisper-cli will re-append this extension
             of: attemptFile.replace(/\.json$/i, '')
         },
-        execOptions = {
-            cwd: `${process.env.HOME}/src/whisper.cpp/`
-        }
+        execOptions = cfg.scribe.execOptions
     ;
 
     if(fs.existsSync(promotFile))
@@ -117,7 +117,7 @@ function transcribe(attempt, options = {}) { return new Promise((res, rej) =>
         {
             ffmpegArgs[op] = options[op];
         }
-        if(Object.prototype.hasOwnProperty.call(cliArgsArgs, op))
+        if(Object.prototype.hasOwnProperty.call(cliArgs, op))
         {
             cliArgs[op] = options[op];
         }
@@ -255,7 +255,13 @@ function flagRangeSuspect(ranges)
     {
         if(!fs.existsSync(attemptJsonFilename(attempt)))
         {
-            await transcribe(attempt);
+            await transcribe(attempt,
+                Object.assign(
+                    {},
+                    cfg.scribe?.options || {}, 
+                    cfg.scribe?.depthOptions[main._depth] || {}
+                )
+            );
         }
         parseAndInsertTranscriptionJson(attempt);
     }
@@ -298,6 +304,9 @@ function flagRangeSuspect(ranges)
         });
 
         const childAttempt = new TranscriptionAttempt({
+            // ffmpeg appears it can only slice to an accuracy of a second
+            // so we'll floor()/ceil() to the nearest second around the problematic timestamps
+            // NOTE: This can result in some overlapping transcriptions.
             startTime: (attempt.startTime || 0) + Math.floor(suspect.minFromOffset / 1000),
             endTime: (attempt.startTime || 0) + Math.ceil(suspect.maxToOffset / 1000),
             parentId: attempt.id,
@@ -311,7 +320,8 @@ function flagRangeSuspect(ranges)
         }
     };
 
-    // Is this the base run of main()?
+    // Is this the base recursion run of main()?
+    // If so, let's finalize our work
     if(!attempt?.parentId)
     {
         // Render the merged transcriptions from all the attempts
@@ -319,7 +329,7 @@ function flagRangeSuspect(ranges)
             transcriptions = db.fetchMergedTranscriptions(attempt),
             srt = require('./srt')(transcriptions)
         ;
-        log(`Writing to srt file:`, srtFile);
+        //log(`Writing to srt file:`, srtFile);
         fs.writeFileSync(srtFile, srt, enc);
         log(`Successfully generated srt file:`, srtFile);
         log('Runtime (secs):', process.uptime());
