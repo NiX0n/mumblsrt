@@ -23,6 +23,7 @@ stats AS (
     SELECT
         COUNT(*) * 1.0 AS n,
         AVG(depth)     AS mean,
+        MAX(depth)     AS max,
         -- AVG(depth^2) - AVG(depth)^2
         AVG(depth * 1.0 * depth) - AVG(depth) * AVG(depth) variance
     FROM ta_desc
@@ -59,6 +60,21 @@ mode AS (
         GROUP BY depth
     )
     WHERE rnk = 1
+),
+occurances AS (
+    SELECT 
+        SUM(CASE depth WHEN mode THEN 1 ELSE 0 END) mode_count,
+        SUM(CASE depth WHEN mode THEN 1 ELSE 0 END) * 1.0 / COUNT(*) mode_popularity,
+        SUM(CASE depth WHEN median THEN 1 ELSE 0 END) median_count,
+        SUM(CASE depth WHEN median THEN 1 ELSE 0 END) * 1.0 / COUNT(*) median_popularity,
+        SUM(CASE depth WHEN max THEN 1 ELSE 0 END) max_count,
+        SUM(CASE depth WHEN max THEN 1 ELSE 0 END) * 1.0 / COUNT(*) max_popularity
+
+    FROM 
+        ta_desc,
+        stats,
+        mode,
+        median
 )
 SELECT
     mo.mode,
@@ -66,7 +82,9 @@ SELECT
     mo2.mean,
     mo2.variance,
     mo2.stdev,
-    mo2.skewness
+    mo2.skewness,
+    occ.*
 FROM moments mo2
 JOIN median md
 JOIN mode mo
+JOIN occurances occ
