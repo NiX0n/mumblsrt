@@ -325,7 +325,7 @@ function flagRangeSuspect(ranges)
     const stutterings = db.fetchTranscriptionStutter(attempt);
     if(!stutterings?.length)
     {
-        log("No inter-transcription stuttering in this attempt");
+        log("No transcription stuttering in this attempt");
     }
     else
     {
@@ -333,6 +333,10 @@ function flagRangeSuspect(ranges)
         flagRangeSuspect(stutterings);
     }
 
+    // Some failures come in the form of transcription records
+    // w/ zero differnce between fromOffset and toOffset.
+    // We compsnsate by flagging any contiguous zero lengths
+    // And the surrounding +/- minute range as suspect.
     const zeroLens = db.fetchZeroLengthTranscriptions(attempt);
     if(zeroLens.length)
     {
@@ -340,17 +344,22 @@ function flagRangeSuspect(ranges)
         flagRangeSuspect(zeroLens);
     }
 
+    // Find all of our contiguous suspects
     const suspects = db.fetchSuspectTranscriptions(attempt);
     for(const suspect of suspects)
     {
         log('Suspect found:', suspect);
-        // De-Activate stuttering transcriptions
+        // De-activate  transcriptions
+        // These transcriptions will no longer show up in the final merge
         db.updateTranscriptions({
             isActive: 0
         }, {
             id: {min: suspect.minId, max: suspect.maxId}
         });
 
+        // Define our immediate descendant's attempt
+        // We're going to just keep trying sections of suspect ranges
+        // Until we're either happy with the result, or we give up.
         const childAttempt = new TranscriptionAttempt({
             // ffmpeg appears it can only slice to an accuracy of a second
             // so we'll floor()/ceil() to the nearest second around the problematic timestamps
@@ -361,6 +370,7 @@ function flagRangeSuspect(ranges)
             file: attempt.file
         }); 
         try {
+            // Recurse!
             await main(childAttempt);
         } finally {
             // Always decrement depth when unwinding
