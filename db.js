@@ -250,6 +250,35 @@ function fetchSuspectTranscriptions(attempt)
     return stmt.all(parameters).map(row => new TranscriptionRange(row, true));
 }
 
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {object}
+ */
+function fetchAttemptStats(attempt)
+{
+    const 
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_attempt_stats.sql`, enc),
+        parameters = {attemptId: attempt.id}, 
+        stmt = getDb().prepare(sql)
+    ;
+    return stmt.get(parameters);
+}
+
+
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {object}
+ */
+function fetchAttemptDepthStats(attempt)
+{
+    const 
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_attempt_depth_stats.sql`, enc),
+        parameters = {attemptId: attempt.id}, 
+        stmt = getDb().prepare(sql)
+    ;
+    return stmt.get(parameters);
+}
+
 module.exports = {
     isDbInit,
     initDb,
@@ -263,5 +292,7 @@ module.exports = {
     fetchTranscriptionStutter,
     fetchZeroLengthTranscriptions,
     fetchSuspectTranscriptions,
-    fetchMergedTranscriptions
+    fetchMergedTranscriptions,
+    fetchAttemptStats,
+    fetchAttemptDepthStats
 };
