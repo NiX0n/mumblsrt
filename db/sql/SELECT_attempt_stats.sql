@@ -34,6 +34,8 @@ ta_desc_agg AS (
 		COUNT(*) attempt_count,
 		MAX(depth) max_depth,
 		AVG(depth) mean_depth,
+		-- AVG(depth^2) - AVG(depth)^2
+		AVG(depth * 1.0 * depth) - AVG(depth) * AVG(depth) depth_variance,
 		SQRT(AVG(depth * 1.0 * depth) - AVG(depth) * AVG(depth)) depth_stdev
 		
 	FROM ta_desc

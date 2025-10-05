@@ -23,7 +23,8 @@ stats AS (
     SELECT
         COUNT(*) * 1.0 AS n,
         AVG(depth)     AS mean,
-        SUM((depth - AVG(depth)) * (depth - AVG(depth))) OVER () / COUNT(*) OVER () AS variance
+        -- AVG(depth^2) - AVG(depth)^2
+        AVG(depth * 1.0 * depth) - AVG(depth) * AVG(depth) variance
     FROM ta_desc
 ),
 moments AS (
