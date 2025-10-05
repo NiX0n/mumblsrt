@@ -279,6 +279,20 @@ function fetchAttemptDepthStats(attempt)
     return stmt.get(parameters);
 }
 
+/**
+ * @param {TranscriptionAttempt} attempt 
+ * @returns {object}
+ */
+function fetchAttemptDescendants(attempt)
+{
+    const 
+        sql = fs.readFileSync(`${__dirname}/db/sql/SELECT_attempt_descendants.sql`, enc),
+        parameters = {attemptId: attempt.id}, 
+        stmt = getDb().prepare(sql)
+    ;
+    return stmt.all(parameters);
+}
+
 module.exports = {
     isDbInit,
     initDb,
@@ -294,5 +308,6 @@ module.exports = {
     fetchSuspectTranscriptions,
     fetchMergedTranscriptions,
     fetchAttemptStats,
-    fetchAttemptDepthStats
+    fetchAttemptDepthStats,
+    fetchAttemptDescendants
 };

@@ -20,24 +20,10 @@ ta_desc AS (
 	INNER JOIN ta_desc desc
 		ON ta.parent_id = desc.id
 ),
-ta_desc_depths AS (
-	SELECT 
-		depth,
-		COUNT(*) count
-	FROM ta_desc
-	GROUP BY depth
-	ORDER BY depth
-),
---SELECT * FROM ta_desc_depths
 ta_desc_agg AS (
 	SELECT 
-		COUNT(*) attempt_count,
-		MAX(depth) max_depth,
-		AVG(depth) mean_depth,
-		-- AVG(depth^2) - AVG(depth)^2
-		AVG(depth * 1.0 * depth) - AVG(depth) * AVG(depth) depth_variance,
-		SQRT(AVG(depth * 1.0 * depth) - AVG(depth) * AVG(depth)) depth_stdev
-		
+		COUNT(*) attempt_count
+	
 	FROM ta_desc
 ),
 t_agg AS (
@@ -59,8 +45,8 @@ t_agg AS (
 t_agg_agg AS (
 	SELECT 
 		SUM(transcription_count) total_transcription_count,
-		AVG(transcription_count) mean_transcription_count,
 		SUM(active_count) total_active_count,
+		AVG(transcription_count) mean_transcription_count,
 		SUM(suspect_count) total_suspect_count,
 		SUM(suspect_count)*1.0/SUM(transcription_count) suspect_rate,
 		MAX(attempt_length) max_attempt_length,
@@ -76,15 +62,14 @@ ta_agg AS (
 	SELECT 
 		ta_desc_agg.*,
 		t_agg_agg.*,
-		SUM(CASE WHEN depth = ta_desc_agg.max_depth THEN 1 ELSE 0 END) max_depth_count,
 		MAX(ta.end_time - ta.start_time) max_child_length,
-		AVG(COALESCE(ta.end_time - ta.start_time, t_agg_agg.max_attempt_length)) mean_descendant_length,
+		AVG(COALESCE(ta.end_time - ta.start_time, t_agg_agg.max_attempt_length)) mean_desc_length,
 		SQRT(
 			AVG((ta.end_time - ta.start_time) * 1.0 * (ta.end_time - ta.start_time)) 
 				- AVG((ta.end_time - ta.start_time)) 
 				* AVG((ta.end_time - ta.start_time))
 		)
-			stdev_descendant_length,
+			stdev_desc_length,
 		SQRT(
 			AVG(COALESCE(ta.end_time - ta.start_time, t_agg_agg.max_attempt_length) * 1.0 * COALESCE(ta.end_time - ta.start_time, t_agg_agg.max_attempt_length)) 
 				- AVG(COALESCE(ta.end_time - ta.start_time, t_agg_agg.max_attempt_length)) 
@@ -103,4 +88,3 @@ ta_agg AS (
 
 SELECT *
 FROM ta_agg
-;

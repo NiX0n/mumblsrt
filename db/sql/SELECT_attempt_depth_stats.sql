@@ -30,6 +30,7 @@ stats AS (
 ),
 moments AS (
     SELECT
+        max,
         mean,
         variance,
         SQRT(variance) AS stdev,
@@ -64,11 +65,11 @@ mode AS (
 occurances AS (
     SELECT 
         SUM(CASE depth WHEN mode THEN 1 ELSE 0 END) mode_count,
-        SUM(CASE depth WHEN mode THEN 1 ELSE 0 END) * 1.0 / COUNT(*) mode_popularity,
+        SUM(CASE depth WHEN mode THEN 1 ELSE 0 END) * 1.0 / COUNT(*) mode_rate,
         SUM(CASE depth WHEN median THEN 1 ELSE 0 END) median_count,
-        SUM(CASE depth WHEN median THEN 1 ELSE 0 END) * 1.0 / COUNT(*) median_popularity,
+        SUM(CASE depth WHEN median THEN 1 ELSE 0 END) * 1.0 / COUNT(*) median_rate,
         SUM(CASE depth WHEN max THEN 1 ELSE 0 END) max_count,
-        SUM(CASE depth WHEN max THEN 1 ELSE 0 END) * 1.0 / COUNT(*) max_popularity
+        SUM(CASE depth WHEN max THEN 1 ELSE 0 END) * 1.0 / COUNT(*) max_rate
 
     FROM 
         ta_desc,
@@ -79,6 +80,7 @@ occurances AS (
 SELECT
     mo.mode,
     md.median,
+    mo2.max,
     mo2.mean,
     mo2.variance,
     mo2.stdev,
