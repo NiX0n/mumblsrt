@@ -179,38 +179,52 @@ Using the default configuaration, this will ultimately generate a subtitle file 
 The `config.js` file stores various settings.  It notably is the place to define and onverride arguments passed to ffmpeg and whisper-cli.
 
 ### wd
-`wd` is the Working Directory where all of our temporary filee (SQLite DB, WAV file cache, transcription JSON output files, etc.) are located.
+*Signature:* `wd: {string}` 
+
+This the Working Directory where all of our temporary filee (SQLite DB, WAV file cache, transcription JSON output files, etc.) are located.
+
+### maxRecursion
+*Signature:* `wd: {integer}` 
+
+This the maximum recursion depth we're allowed to descend before giving up.  
+
+*Notice:* While there is a `maxRecursion` limit, there is no similar `maxAttempt`-like limit, as the breadth of the recursion tree is always finite.
 
 ### scribe.srtFileTransform
-`scribe.srtFileTransform: {function (file): string}`
+*Signature:* `scribe.srtFileTransform: {function (file): string}`
 
 Transforms the input filename to the output srt's.
 
 ### scribe.model
-`scribe.model: {string}`
+*Signature:* `scribe.model: {string}`
 
 Defines the path (relative to Whisper.cpp's base directory) to the OpenAI WhisperAI model you're going to use (that you downloaded after compiling Whisper.cpp).
 
 **Tip:** Larger models take longer to process transcriptions, but tend to do a better job.  No model is free from errors though.
 
 ### scribe.options
-`scribe.options: {object}`
+*Signature:* `scribe.options: {object}`
 
 These are command arguments passed to either ffmpeg or whisper-cli.  The expected argument names are mutually exclusive from one another, so both sets of arguments are supported as keys of this object.  Refer to their respective help pages for guidance on what options do what.  Most defaults won't need changing though.
 
 **Tip:** Take note of the number of available threads your machine has.  For example, set `options: {t: 20}` for 20 available threads.
 
 ### scribe.depthOptions
-`scribe.depthOptions: {object<string, object>}`
+*Signature:* `scribe.depthOptions: {object<string, object>}`
 
 Sometimes it is useful to have overriding options at different recursion depths.  For example, on the first depth level, you may want to use the `p` whisper-cli option to safely sub-divide the track into more manageable chunks of known equal size.
 
 You may also want to choose to set more exotic options for larger depths to encourage diversity in approach when in a high failure state.
 
 ### scribe.execOptions
-`scribe.execOptions: {object<string, any>}`
+*Signature:* `scribe.execOptions: {object<string, any>}`
 
 Options passed to node prcoess.spawn().  Notably, this has `cwd` set to Whisper.cpp base directory.
+
+### db.path
+*Signature:* `db.path: {string}`
+
+This is the path passed to the SQLite DatabaseSync conststructor.  The sane place is to leave it in the `wd`.  It's technically possible to run the database in `:memory:`; but it's not recommended, as the performance gain is very limited, and the application is designed to be able to pick up from previous failures/interruptions.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
