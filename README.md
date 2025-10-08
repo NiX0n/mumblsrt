@@ -23,8 +23,6 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![License: MIT][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
-
 
 
 <!-- PROJECT LOGO -->
@@ -34,10 +32,10 @@
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a-->
 
-  <h3 align="center">mumblsrt</h3>
+  <h1 align="center">Mumblsrt</h1>
 
   <p align="center">
-    A subtitle generation tool that leverages and overcomes limitatinos of whisper.cpp.
+    A subtitle generation tool that leverages and overcomes limitatinos of Whisper.cpp.
     <br />
     <a href="https://github.com/NiX0n/mumblsrt"><strong>Explore the docs »</strong></a>
     <br />
@@ -57,9 +55,9 @@
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
+      <a href="#about-the-project">About Mumblsrt</a>
       <ul>
-        <li><a href="#built-with">Built With</a></li>
+        <li><a href="#nethodology">Methodology</a></li>
       </ul>
     </li>
     <li>
@@ -70,6 +68,7 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#configuration">Configuration</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -81,37 +80,41 @@
 
 
 <!-- ABOUT THE PROJECT -->
-## About The Project
+## About Mumblsrt
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+Mumblsrt is a [NodeeJS][NodeJS-url] utility for generating [SRT files][srt-url] for temporally large media using [Whisper.cpp][whispercpp-url]--which leverages OpenAI's WhisperAI models.  We're also leveraging [ffmpeg][ffmpeg-url] which allows us to generate subtitles for any of its vast supported media types (audio or video).
 
-There are many great README templates available on GitHub; however, I didn't find one that really suited my needs so I created this enhanced one. I want to create a README template so amazing that it'll be the last one you ever need -- I think this is it.
+This project is perfect for transcribing:
+ * VHS rips
+ * Long audio tracks
+ * Any media that doesn't already have subtitles
+ * In theory, also translating foreign languages (untested)
 
-Here's why:
-* Your time should be focused on creating something amazing. A project that solves a problem and helps others
-* You shouldn't be doing the same tasks over and over like creating a README from scratch
-* You should implement DRY principles to the rest of your life :smile:
 
-Of course, no one template will serve all projects since your needs may be different. So I'll be adding more in the near future. You may also suggest changes by forking this repo and creating a pull request or opening an issue. Thanks to all the people have contributed to expanding this template!
+Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This tool on its own can technically generate SRT files using the `-osrt` option, but _ALL_ Whisper models have a distinct hallucinatory failure mode on long stretches of audio.
 
-Use the `BLANK_README.md` to get started.
+*Tip*: If you are looking to make subtitles on audio tracks less than 10 minutes or so, you're probably better off just using Whisper.cpp on its own without Mumblsrt.
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
+### Methodology
+We can overcome the tehnical limitations of Whisper by making some basic assumptions:
+1. Whisper will get at least something, if not most, right on most attempts
+2. We can identify when it's wrong using statistical analysis
 
-### Built With
+Given these assumptions, we can work around the problem we identify in #2 by repeatedly force feeding Whisper subsequently shorter chunks of audio by "dividing and conquering" the whole audio track.
 
-This section should list any major frameworks/libraries used to bootstrap your project. Leave any add-ons/plugins for the acknowledgements section. Here are a few examples.
+Specifically we take an iterative depth-first tree recursion approach.  On the first root level of the recursion tree, our first attempt, we try to transcribe the entire input file.  On each recursion attempt:
+1. Instead of generating a subtitle file directly, we let ffmpeg+Whisper.cpp generate machine-readable JSON files.
+2. We ingest those transcription JSON files into a SQLite database that we can run relatively more complex queries.
+3. If for some reason we've recursed to some limit (default: 9 levels deep), we'll just settle with whatever we have at that level.
+4. We identify any suspect transciption timestamp ranges, and deactivate them so they are ignored in the final output.
+5. For each of the contiguous ranges, recurse to step #1 for the suspect ranges.
 
-* [![Next][Next.js]][Next-url]
-* [![React][React.js]][React-url]
-* [![Vue][Vue.js]][Vue-url]
-* [![Angular][Angular.io]][Angular-url]
-* [![Svelte][Svelte.dev]][Svelte-url]
-* [![Laravel][Laravel.com]][Laravel-url]
-* [![Bootstrap][Bootstrap.com]][Bootstrap-url]
-* [![JQuery][JQuery.com]][JQuery-url]
+It's worth noting that we are piping a copy the output of ffmpeg to a local wav file for the purposes of efficient caching and slicing.  This wave file is used on subsequent attempts without touching the original file again.
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -119,40 +122,39 @@ This section should list any major frameworks/libraries used to bootstrap your p
 
 <!-- GETTING STARTED -->
 ## Getting Started
-
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
+Before you can run Mumblsrt, you first have to get a few things set up.
 
 ### Prerequisites
+You will need to have the following installed and/or compiled on your system:
+ * [NodeJS][NodeJS-url]
+ * [ffmpeg][ffmpeg-url]
+ * [Whisper.cpp][whispercpp-url]
+ 
+#### NodeJS & ffmpeg
+We assume you've installed (i.e. via OS package manager, etc.) these two executables separately and that the respective executable binaries are visible via the $PATH environment variable.  If this is not the case, then some code modification may be required.
 
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
+#### Whisper.cpp
+Check out and compile Whisper.cpp by following the [directions in their own README][whispercpp-url].  Take note of any hardware acceleration compile-time options you might want to leverage (i.e. `-DGGML_CUDA=1` or `-DGGML_VULKAN=1`), as these drastically improve performance over CPU-only transcription.
+
+You will also need to follow the instructions on how to download and install the model you want to use.
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 
 ### Installation
 
 _Below is an example of how you can instruct your audience on installing and setting up your app. This template doesn't rely on any external dependencies or services._
 
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
+1. Clone the repo
    ```sh
    git clone https://github.com/NiX0n/mumblsrt.git
    ```
-3. Install NPM packages
+2. Install NPM packages
    ```sh
    npm install
    ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
-5. Change git remote url to avoid accidental pushes to base project
-   ```sh
-   git remote set-url origin NiX0n/mumblsrt
-   git remote -v # confirm the changes
-   ```
+3. If necessary, update `config.js` to meet your system's specifications (see: <a href="#configuration">Configuration</a>).  
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -163,22 +165,62 @@ _Below is an example of how you can instruct your audience on installing and set
 
 Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+   ```sh
+   ./run.sh "/path/to/media.mp4"
+   ```
+
+Using the default configuaration, this will ultimately generate a subtitle file in the same directory and filename as the input media, with a replaced extension: `.mumbl.srt`.
+
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Configuration
+The `config.js` file stores various settings.  It notably is the place to define and onverride arguments passed to ffmpeg and whisper-cli.
+
+### wd
+`wd` is the Working Directory where all of our temporary filee (SQLite DB, WAV file cache, transcription JSON output files, etc.) are located.
+
+### scribe.srtFileTransform
+`scribe.srtFileTransform: {function (file): string}`
+
+Transforms the input filename to the output srt's.
+
+### scribe.model
+`scribe.model: {string}`
+
+Defines the path (relative to Whisper.cpp's base directory) to the OpenAI WhisperAI model you're going to use (that you downloaded after compiling Whisper.cpp).
+
+*Tip:* Larger models take longer to process transcriptions, but tend to do a better job.  No model is free from errors though.
+
+### scribe.options
+`scribe.options: {object}`
+
+These are command arguments passed to either ffmpeg or whisper-cli.  The expected argument names are mutually exclusive from one another, so both sets of arguments are supported as keys of this object.  Refer to their respective help pages for guidance on what options do what.  Most defaults won't need changing though.
+
+*Tip:* Take note of the number of available threads your machine has.  For example, set `options: {t: 20}` for 20 available threads.
+
+### scribe.depthOptions
+`scribe.depthOptions: {object<string, object>}`
+
+Sometimes it is useful to have overriding options at different recursion depths.  For example, on the first depth level, you may want to use the `p` whisper-cli option to safely sub-divide the track into more manageable chunks of known equal size.
+
+You may also want to choose to set more exotic options for larger depths to encourage diversity in approach when in a high failure state.
+
+### scribe.execOptions
+`scribe.execOptions: {object<string, any>}`
+
+Options passed to node prcoess.spawn().  Notably, this has `cwd` set to Whisper.cpp base directory.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [x] Add Changelog
-- [x] Add back to top links
-- [ ] Add Additional Templates w/ Examples
-- [ ] Add "components" document to easily copy & paste sections of the readme
-- [ ] Multi-language Support
-    - [ ] Chinese
-    - [ ] Spanish
+- [ ] Add Changelog
+- [ ] Add back to top links
+- [ ] Add more details on stats
 
 See the [open issues](https://github.com/NiX0n/mumblsrt/issues) for a full list of proposed features (and known issues).
 
@@ -199,12 +241,6 @@ Don't forget to give the project a star! Thanks again!
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
-### Top contributors:
-
-<a href="https://github.com/NiX0n/mumblsrt/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=NiX0n/mumblsrt" alt="contrib.rocks image" />
-</a>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -230,17 +266,9 @@ Project Link: [https://github.com/NiX0n/mumblsrt][repo-url]
 
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
+A special thanks to:
 
-Use this space to list resources you find helpful and would like to give credit to. I've included a few of my favorites to kick things off!
-
-* [Choose an Open Source License](https://choosealicense.com)
-* [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
-* [Malven's Flexbox Cheatsheet](https://flexbox.malven.co/)
-* [Malven's Grid Cheatsheet](https://grid.malven.co/)
-* [Img Shields](https://shields.io)
-* [GitHub Pages](https://pages.github.com)
-* [Font Awesome](https://fontawesome.com)
-* [Best-README-Template][Best-README-url]
+* [Best-README-Template][Best-README-url], for this very useful README.md template.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -259,24 +287,12 @@ Use this space to list resources you find helpful and would like to give credit 
 
 [license-shield]: https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge
 [license-url]: https://opensource.org/licenses/MIT
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/othneildrew
-[product-screenshot]: images/screenshot.png
 
 
-[Next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
 [whispercpp-url]: https://github.com/ggml-org/whisper.cpp
-[React.js]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
-[React-url]: https://reactjs.org/
-[Vue.js]: https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D
-[Vue-url]: https://vuejs.org/
-[Angular.io]: https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white
-[Angular-url]: https://angular.io/
-[Svelte.dev]: https://img.shields.io/badge/Svelte-4A4A55?style=for-the-badge&logo=svelte&logoColor=FF3E00
-[Svelte-url]: https://svelte.dev/
-[Laravel.com]: https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white
-[Laravel-url]: https://laravel.com
-[Bootstrap.com]: https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white
+[ffmpeg-url]: https://ffmpeg.org/ffmpeg.html
+[srt-url]: https://en.wikipedia.org/wiki/SubRip
+[SQLite-url]: https://svelte.dev/
+[NodeJS-url]: https://laravel.com
 [repo-url]: https://github.com/NiX0n/mumblsrt/
-[JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
 [Best-README-url]: https://github.com/othneildrew/Best-README-Template 
