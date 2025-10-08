@@ -138,9 +138,7 @@ Check out and compile Whisper.cpp by following the [directions in their own READ
 
 You will also need to follow the instructions on how to download and install the model you want to use.
 
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 ### Installation
 
@@ -158,8 +156,6 @@ Once you have the prerequisites installed, you can proceed with using mumblsrt.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- USAGE EXAMPLES -->
 ## Usage
 
@@ -170,8 +166,6 @@ Once mumblsrt is installed an configured, you run it using the following syntax:
    ```
 
 Using the default configuaration, this will ultimately generate a subtitle file in the same directory and filename as the input media, with a replaced extension: `.mumbl.srt`.
-
-
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -243,7 +237,6 @@ This is the `path` argument passed to the [SQLite DatabaseSync conststructor](ht
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
 <!-- ROADMAP -->
 ## Roadmap
 
@@ -255,8 +248,6 @@ This is the `path` argument passed to the [SQLite DatabaseSync conststructor](ht
 See the [open issues](https://github.com/NiX0n/mumblsrt/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- CONTRIBUTING -->
 ## Contributing
@@ -274,16 +265,12 @@ Don't forget to give the project a star! Thanks again!
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- LICENSE -->
 ## License
 
 Distributed under the [MIT License][license-url].
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- CONTACT -->
 ## Contact
@@ -292,8 +279,6 @@ Project Link: [https://github.com/NiX0n/mumblsrt][repo-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 A special thanks to:
@@ -301,8 +286,6 @@ A special thanks to:
 * [Best-README-Template][Best-README-url], for this very useful README.md template.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
