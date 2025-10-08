@@ -54,7 +54,7 @@ async function main (attempt = null)
         throw new Error('No stats');
     }
 
-    log(' ──── Recursion Depth Stats ──── ');
+    log(' ────── Recursion Depth Stats ───────');
     table(depthStats);
 }
 
