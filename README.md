@@ -82,7 +82,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About Mumblsrt
 
-Mumblsrt is a [NodeeJS][NodeJS-url] utility for generating [SRT files][srt-url] for temporally large media using [Whisper.cpp][whispercpp-url]--which leverages OpenAI's WhisperAI models.  We're also leveraging [ffmpeg][ffmpeg-url] which allows us to generate subtitles for any of its vast supported media types (audio or video).
+Mumblsrt is a [NodeJS][NodeJS-url] utility for generating [SRT files][srt-url] for temporally large media using [Whisper.cpp][whispercpp-url]--which leverages OpenAI's WhisperAI models.  We're also leveraging [ffmpeg][ffmpeg-url] which allows us to generate subtitles for any of its vast supported media types (audio or video).
 
 This project is perfect for transcribing:
  * VHS rips
@@ -144,7 +144,7 @@ You will also need to follow the instructions on how to download and install the
 
 ### Installation
 
-_Below is an example of how you can instruct your audience on installing and setting up your app. This template doesn't rely on any external dependencies or services._
+Once you have the prerequisites installed, you can proceed with using mumblsrt.
 
 1. Clone the repo
    ```sh
@@ -163,7 +163,7 @@ _Below is an example of how you can instruct your audience on installing and set
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+Once mumblsrt is installed an configured, you run it using the following syntax:
 
    ```sh
    ./run.sh "/path/to/media.mp4"
@@ -218,9 +218,10 @@ Options passed to node prcoess.spawn().  Notably, this has `cwd` set to Whisper.
 <!-- ROADMAP -->
 ## Roadmap
 
+- [x] Add back to top links
 - [ ] Add Changelog
-- [ ] Add back to top links
 - [ ] Add more details on stats
+- [ ] Add garbage collection
 
 See the [open issues](https://github.com/NiX0n/mumblsrt/issues) for a full list of proposed features (and known issues).
 
@@ -276,6 +277,7 @@ A special thanks to:
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+[repo-url]: https://github.com/NiX0n/mumblsrt/
 [contributors-shield]: https://img.shields.io/github/contributors/NiX0n/mumblsrt.svg?style=for-the-badge
 [contributors-url]: https://github.com/NiX0n/mumblsrt/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/NiX0n/mumblsrt.svg?style=for-the-badge
@@ -284,15 +286,11 @@ A special thanks to:
 [stars-url]: https://github.com/NiX0n/mumblsrt/stargazers
 [issues-shield]: https://img.shields.io/github/issues/NiX0n/mumblsrt.svg?style=for-the-badge
 [issues-url]: https://github.com/NiX0n/mumblsrt/issues
-
 [license-shield]: https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge
 [license-url]: https://opensource.org/licenses/MIT
-
-
 [whispercpp-url]: https://github.com/ggml-org/whisper.cpp
 [ffmpeg-url]: https://ffmpeg.org/ffmpeg.html
 [srt-url]: https://en.wikipedia.org/wiki/SubRip
-[SQLite-url]: https://svelte.dev/
-[NodeJS-url]: https://laravel.com
-[repo-url]: https://github.com/NiX0n/mumblsrt/
+[SQLite-url]: https://sqlite.org/
+[NodeJS-url]: https://nodejs.org/
 [Best-README-url]: https://github.com/othneildrew/Best-README-Template 
