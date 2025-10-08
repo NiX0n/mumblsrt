@@ -93,7 +93,7 @@ This project is perfect for transcribing:
 
 Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This tool on its own can technically generate SRT files using the `-osrt` option, but _ALL_ Whisper models have a distinct hallucinatory failure mode on long stretches of audio.
 
-*Tip*: If you are looking to make subtitles on audio tracks less than 10 minutes or so, you're probably better off just using Whisper.cpp on its own without Mumblsrt.
+**Tip:** If you are looking to make subtitles on audio tracks less than 10 minutes or so, you're probably better off just using Whisper.cpp on its own without Mumblsrt.
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -191,14 +191,14 @@ Transforms the input filename to the output srt's.
 
 Defines the path (relative to Whisper.cpp's base directory) to the OpenAI WhisperAI model you're going to use (that you downloaded after compiling Whisper.cpp).
 
-*Tip:* Larger models take longer to process transcriptions, but tend to do a better job.  No model is free from errors though.
+**Tip:** Larger models take longer to process transcriptions, but tend to do a better job.  No model is free from errors though.
 
 ### scribe.options
 `scribe.options: {object}`
 
 These are command arguments passed to either ffmpeg or whisper-cli.  The expected argument names are mutually exclusive from one another, so both sets of arguments are supported as keys of this object.  Refer to their respective help pages for guidance on what options do what.  Most defaults won't need changing though.
 
-*Tip:* Take note of the number of available threads your machine has.  For example, set `options: {t: 20}` for 20 available threads.
+**Tip:** Take note of the number of available threads your machine has.  For example, set `options: {t: 20}` for 20 available threads.
 
 ### scribe.depthOptions
 `scribe.depthOptions: {object<string, object>}`
