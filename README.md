@@ -219,12 +219,12 @@ You may also want to choose to set more exotic options for larger depths to enco
 ### scribe.execOptions
 *Signature:* `scribe.execOptions: {object<string, any>}`
 
-Options passed to node prcoess.spawn().  Notably, this has `cwd` set to Whisper.cpp base directory.
+Options passed to [child_process.exec()](https://nodejs.org/api/child_process.html#child_processexeccommand-options-callback).  Notably, this has `cwd` set to Whisper.cpp base directory.
 
 ### db.path
 *Signature:* `db.path: {string}`
 
-This is the path passed to the SQLite DatabaseSync conststructor.  The sane place is to leave it in the `wd`.  It's technically possible to run the database in `:memory:`; but it's not recommended, as the performance gain is very limited, and the application is designed to be able to pick up from previous failures/interruptions.
+This is the path passed to the [SQLite DatabaseSync conststructor](https://nodejs.org/api/sqlite.html#class-databasesync).  The sane place is to leave it in the `wd`.  It's technically possible to run the database in `:memory:`; but it's not recommended, as the performance gain is very limited, and the application is designed to be able to pick up from previous failures/interruptions.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
