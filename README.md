@@ -306,10 +306,13 @@ A special thanks to:
 [issues-url]: https://github.com/NiX0n/mumblsrt/issues
 [license-shield]: https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge
 [license-url]: https://opensource.org/licenses/MIT
+[whispercpp]: https://img.shields.io/badge/C++-Whisper.cpp-blue
 [whispercpp-url]: https://github.com/ggml-org/whisper.cpp
 [whispercli-url]: https://github.com/ggml-org/whisper.cpp/blob/master/examples/cli/README.md
+[ffpmeg]: https://shields.io/badge/FFmpeg-%23171717.svg?logo=ffmpeg&style=for-the-badge&labelColor=171717&logoColor=5cb85c
 [ffmpeg-url]: https://ffmpeg.org/ffmpeg.html
 [srt-url]: https://en.wikipedia.org/wiki/SubRip
 [SQLite-url]: https://sqlite.org/
 [NodeJS-url]: https://nodejs.org/
+[NodeJS]: https://img.shields.io/badge/node.js-339933?style=for-the-badge&logo=Node.js&logoColor=white
 [Best-README-url]: https://github.com/othneildrew/Best-README-Template 
