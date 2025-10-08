@@ -35,7 +35,7 @@
   <h1 align="center">Mumblsrt</h1>
 
   <p align="center">
-    A subtitle generation tool that leverages and overcomes limitatinos of Whisper.cpp.
+    A subtitle generation tool that leverages and overcomes limitations of Whisper.cpp.
     <br />
     <a href="https://github.com/NiX0n/mumblsrt"><strong>Explore the docs »</strong></a>
     <br />
