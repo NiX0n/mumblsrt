@@ -209,21 +209,20 @@ These are command arguments passed to either [ffmpeg][ffmpeg-url] or [whisper-cl
 
 **Tip:** Take note of the number of available threads your machine has.  For example, set `options: {t: 20}` for 20 available threads.
 
-#### Notable Whisper CLI Options
-| Name |   Type   | Description |
-|:----:|:--------:|-------------|
-|  p   | integer  | # of processes/equal chunks Whisper will divide on its own |
-|  t   | integer  | # of threads to use per process |
-            // Best of. Keep odd
-            bo: 7,
-            // Beam size
-            bs: 7,
-            // Do not use temperature fallback while decoding 
-            nf: true,
-            // No speech threshold
-            nth: 0.20,
-            // maximum segment length in characters
-            ml: 200,
+#### Notable Whisper CLI Options 
+| Name |  Type   | Description |
+|:----:|:-------:|-------------|
+|  p   | integer | # of processes/equal chunks Whisper will divide on its own |
+|  t   | integer | # of threads to use per process |
+|  bo  | integer | Transcription "best of" guess consensus |
+|  bs  | integer | Beam size. Use higher values for noisy or multiple voices |
+|  nf  | boolean | No temperature fallback.  When false, gets more *creative* in low-confidence envionments. |
+|  nth | float   | No speech threshold |
+|  ml  | integer | Maximum segment length in characters |
+|  tp  | float   | Temperature, amount of entropy used for creative choices. |
+
+(See: [whisper-cli usage][whispercli-url] for more)
+
 
 ### scribe.depthOptions
 *Signature:* `scribe.depthOptions: {object<string, object>}`
