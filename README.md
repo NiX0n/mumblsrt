@@ -176,7 +176,7 @@ Using the default configuaration, this will ultimately generate a subtitle file 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Configuration
-The `config.js` file stores various settings.  It notably is the place to define and onverride arguments passed to ffmpeg and whisper-cli.
+The `config.js` file stores various settings.  The copy that comes with this repository already has some sane defaults.  It's recommended that you investigate your own system specifications for proper tuning of these settings.  Notably, this is the place to define and override arguments passed to ffmpeg and whisper-cli (see <a href="#scribeoptions">scribe.options</a> for detail).
 
 ### wd
 *Signature:* `wd: {string}` 
@@ -205,14 +205,14 @@ Defines the path (relative to Whisper.cpp's base directory) to the OpenAI Whispe
 ### scribe.options
 *Signature:* `scribe.options: {object}`
 
-These are command arguments passed to either ffmpeg or whisper-cli.  The expected argument names are mutually exclusive from one another, so both sets of arguments are supported as keys of this object.  Refer to their respective help pages for guidance on what options do what.  Most defaults won't need changing though.
+These are command arguments passed to either [ffmpeg][ffmpeg-url] or [whisper-cli][whispercli-url].  The expected argument names are mutually exclusive from one another, so both sets of arguments are supported as keys of this object.  Refer to their respective help pages for guidance on what options do what.  Most defaults won't need changing though.
 
 **Tip:** Take note of the number of available threads your machine has.  For example, set `options: {t: 20}` for 20 available threads.
 
 ### scribe.depthOptions
 *Signature:* `scribe.depthOptions: {object<string, object>}`
 
-Sometimes it is useful to have overriding options at different recursion depths.  For example, on the first depth level, you may want to use the `p` whisper-cli option to safely sub-divide the track into more manageable chunks of known equal size.
+Sometimes it is useful to have overriding options (see <a href="#scribeoptions">scribe.options</a>) at different recursion depths.  For example, on the first depth level, you may want to use the `p` whisper-cli option to safely sub-divide the track into more manageable chunks of known equal size.
 
 You may also want to choose to set more exotic options for larger depths to encourage diversity in approach when in a high failure state.
 
@@ -224,7 +224,7 @@ Options passed to [child_process.exec()](https://nodejs.org/api/child_process.ht
 ### db.path
 *Signature:* `db.path: {string}`
 
-This is the path passed to the [SQLite DatabaseSync conststructor](https://nodejs.org/api/sqlite.html#class-databasesync).  The sane place is to leave it in the `wd`.  It's technically possible to run the database in `:memory:`; but it's not recommended, as the performance gain is very limited, and the application is designed to be able to pick up from previous failures/interruptions.
+This is the `path` argument passed to the [SQLite DatabaseSync conststructor](https://nodejs.org/api/sqlite.html#class-databasesync).  The sane place is to leave it in the `wd`.  It's technically possible to run the database in `:memory:`; but it's not recommended, as the performance gain is very limited, and the application is designed to be able to pick up from previous failures/interruptions.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -303,6 +303,7 @@ A special thanks to:
 [license-shield]: https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge
 [license-url]: https://opensource.org/licenses/MIT
 [whispercpp-url]: https://github.com/ggml-org/whisper.cpp
+[whispercli-url]: https://github.com/ggml-org/whisper.cpp/blob/master/examples/cli/README.md
 [ffmpeg-url]: https://ffmpeg.org/ffmpeg.html
 [srt-url]: https://en.wikipedia.org/wiki/SubRip
 [SQLite-url]: https://sqlite.org/
