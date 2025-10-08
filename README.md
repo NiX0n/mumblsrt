@@ -214,6 +214,7 @@ These are command arguments passed to either [ffmpeg][ffmpeg-url] or [whisper-cl
 |  nth | float   | No speech threshold |
 |  ml  | integer | Maximum segment length in characters |
 |  tp  | float   | Temperature, amount of entropy used for creative choices. |
+| "-prompt" | string | Optionl string that represents the expected style of transcription |
 
 (See: [whisper-cli usage][whispercli-url] for more)
 
@@ -224,6 +225,11 @@ These are command arguments passed to either [ffmpeg][ffmpeg-url] or [whisper-cl
 Sometimes it is useful to have overriding options (see <a href="#scribeoptions">scribe.options</a>) at different recursion depths.  For example, on the first depth level, you may want to use the `p` whisper-cli option to safely sub-divide the track into more manageable chunks of known equal size.
 
 You may also want to choose to set more exotic options for larger depths to encourage diversity in approach when in a high failure state.
+
+### scribe.promotFile
+*Signature:* `scribe.promotFile: {string}`
+
+This is a filename whose contents will be passed as a `--prompt` option to whisper-cli (See <a href="#notable-whisper-cli-options">"-prompt" in options</a>).
 
 ### scribe.execOptions
 *Signature:* `scribe.execOptions: {object<string, any>}`
