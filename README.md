@@ -169,6 +169,22 @@ Using the default configuaration, this will ultimately generate a subtitle file 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Garbage Collection
+The default configuration uses a local `tmp` working directory (see <a href="#wd">wd configuration</a>).  The current version of this package doesn't do its own garbage collection, so you are responsible for the construction and deletion of the `tmp` directory, before and after use respectively.
+
+   ```sh
+   # before ./run.sh
+   mkdir tmp
+
+   # after ./run.sh
+   rm -rf tmp
+   ```
+Notice: It may be useful to inspect the internal SQLite database for dianostic purposes before deleting your work.  For example, after transcribing, you can see more detail by running:
+   ```sh
+   sqlite3 tmp/db.sqlite3
+   ```
+
+
 ## Configuration
 The `config.js` file stores various settings.  The copy that comes with this repository already has some sane defaults.  It's recommended that you investigate your own system specifications for proper tuning of these settings.  Notably, this is the place to define and override arguments passed to ffmpeg and whisper-cli (see <a href="#scribeoptions">scribe.options</a> for detail).
 
