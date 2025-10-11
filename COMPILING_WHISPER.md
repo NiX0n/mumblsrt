@@ -1,0 +1,33 @@
+# Compiling Whisper.cpp
+Specific to Ubuntu 24.04, as of 2025/10/01.
+
+## Install dependencies
+```sh
+# For Vulkan
+sudo apt install cmake build-essential glslc glslang-tools \
+    libvulkan-dev vulkan-tools libvulkan1 spirv-tools vulkan-headers=1.3.275*
+    
+@ For real-time transcription
+sudo apt install libsdl2-dev
+```
+
+## Download Whisper.cpp Source
+```sh
+mkdir -p ~/src
+cd src/
+git clone https://github.com/ggml-org/whisper.cpp.git
+cd whisper.cpp
+# This is the working version.  Newer v1.8.0+ untested/broken
+git checkout c09b0e0c
+```
+
+## Compile Whisper.cpp
+
+```sh
+# SDL enables real-time
+cmake -B build \ 
+    -DGGML_VULKAN=1 \
+	-DWHISPER_SDL2=ON
+cmake --build build -j --config Release
+```
+
