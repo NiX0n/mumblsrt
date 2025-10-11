@@ -100,8 +100,10 @@ Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This
 
 
 ### Methodology
+The name "mumblsrt" comes from the fact that Whisper tends to "mumble" or "stutter"&mdash;repeating words, phrases, and unspoken characters&mdash;particularly on long stretches of time.  It is believed that this is caused by Whisper's attention context windows becoming saturated, and effectively loses attention altogether.
+
 We can overcome the tehnical limitations of Whisper by making some basic assumptions:
-1. Whisper will get at least something, if not most, right on most attempts
+1. Whisper will get at least something, if not most right on most attempts
 2. We can identify when it's wrong using statistical analysis
 
 Given these assumptions, we can work around the problem we identify in #2 by repeatedly force feeding Whisper subsequently shorter chunks of audio by "dividing and conquering" the whole audio track.
@@ -114,6 +116,16 @@ Specifically we take an iterative depth-first tree recursion approach.  On the f
 5. For each of the contiguous ranges, recurse to step #1 for the suspect ranges.
 
 It's worth noting that we are piping a copy the output of ffmpeg to a local wav file for the purposes of efficient caching and slicing.  This wave file is used on subsequent attempts without touching the original file again.
+
+There are two major classes of failure modes:
+1. Stuttering
+2. Zero-Length Transcriptions
+
+#### "Stutter" Detection
+There are three sub-classes of what we're calling "stuttering"
+1. Intra-trascription stuttering.  Where a word or phrase is repeated numerous times within a single transcription.
+2. Short inter-trascription stuttering.  Where one identical transcriptions are repeted continuuously.
+3. Long inter-trascription stuttering.  Where larger sets of transcriptions are repeated in groups.
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
