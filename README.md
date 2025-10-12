@@ -100,10 +100,10 @@ Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This
 
 
 ### Methodology
-The name "mumblsrt" comes from the fact that Whisper tends to "mumble" or "stutter"&mdash;repeating words, phrases, and unspoken characters&mdash;particularly on long stretches of time.  It is believed that this is caused by Whisper's attention context windows becoming saturated, and effectively loses attention altogether.
+The name "mumblsrt" comes from the fact that Whisper tends to "mumble" or "stutter"&mdash;repeating words, phrases, and unspoken characters&mdash;particularly on long stretches of time.  It is believed that this is caused by Whisper's attention context windows becoming saturated, and effectively loses attention altogether.  Sometimes Whisper is able to recover after a long series a failure.  We will try to use whatever transcriptions that aren't problematic.
 
 We can overcome the tehnical limitations of Whisper by making some basic assumptions:
-1. Whisper will get at least something, if not most right on most attempts
+1. Whisper will get at least something (ustually the beginning), if not most/all right on most attempts
 2. We can identify when it's wrong using statistical analysis
 
 Given these assumptions, we can work around the problem we identify in #2 by repeatedly force feeding Whisper subsequently shorter chunks of audio by "dividing and conquering" the whole audio track.
@@ -113,9 +113,9 @@ Specifically we take an iterative depth-first tree recursion approach.  On the f
 2. We ingest those transcription JSON files into a SQLite database that we can run relatively more complex queries.
 3. If for some reason we've recursed to some limit (default: 9 levels deep), we'll just settle with whatever we have at that level.
 4. We identify any suspect transciption timestamp ranges, and deactivate them so they are ignored in the final output.
-5. For each of the contiguous ranges, recurse to step #1 for the suspect ranges.
+5. Each of the contiguous ranges becomes the definition of a new Whisper attempt; and we recurse to step #1, processing between only the respective timestamps.
 
-It's worth noting that we are piping a copy the output of ffmpeg to a local wav file for the purposes of efficient caching and slicing.  This wave file is used on subsequent attempts without touching the original file again.
+It's worth noting that we are piping a copy the output of ffmpeg to a local `*.wav` file for the purposes of efficient reuse and slicing.  This cached `*.wav` file is used on subsequent attempts without touching the original file again.
 
 There are two major classes of failure modes:
 1. Stuttering
@@ -124,9 +124,20 @@ There are two major classes of failure modes:
 #### "Stutter" Detection
 There are three sub-classes of what we're calling "stuttering"
 1. Intra-trascription stuttering.  Where a word or phrase is repeated numerous times within a single transcription.
-2. Short inter-trascription stuttering.  Where one identical transcriptions are repeted continuuously.
+2. Short inter-trascription stuttering.  Where one identical transcription is repeted continuuously.
 3. Long inter-trascription stuttering.  Where larger sets of transcriptions are repeated in groups.
 
+These "stutterings" will repeat for long stretches of time.  Sometimes Whisper will recover after a period of failure.  Internally, Whisper's confidence scpres of its assertions are not indicative on their own of an issue.  In fact, some repeteated tramscriptions counter-intuitively have progressively higher confidence scores.
+
+The method we use to detect stutterings by calculating the average/mean count of each word (contiguous non-whitespace) over a sliding window function.  The sliding window is a contiguous range of transcriptions of variable count (1, 3, 5, and 7).  If at any of those window sizes, the average word count is greater than 2, we will consider it a stutter and will flag that range as **SUSPECT** (`is_suspect=true`).
+
+#### Zero-Length Detection
+The other less prominent failure mode presents itself as transcriptions with zero length&mdash;as in, the timestamps have zero time between them.  This is basic comparison/arithmetic to query for.  However, what is tricky is that its also accompanied by a "driftinng" behavior, where transcriptions lose syncronization with respective speach.  We're using a bit of a hacky work around, and marking the surrounding minute of transcriptions as **SUSPECT** (`is_suspect=1`).
+
+#### Suspect Ranges
+Once all suspect transcriptions have been marked (`is_suspect=1`), they will be fully deactivated (`is_active=0`) which will cause them to be ignored in the final output file.  Then the (notably finite) list of contiguous ranges become the definitions for subsequent recursion attempts.
+
+**Notice:** If we have already hit recursion limit, we would have stopped at that depth prior to suspect transcription identification.  This is what prevents infinite recursion, and a means of always having something transcribed.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -182,7 +193,7 @@ Using the default configuaration, this will ultimately generate a subtitle file 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Garbage Collection
-The default configuration uses a local `tmp` working directory (see <a href="#wd">wd configuration</a>).  The current version of this package doesn't do its own garbage collection, so you are responsible for the construction and deletion of the `tmp` directory, before and after use respectively.
+The default configuration uses a local `tmp` working directory (see <a href="#wd">wd configuration</a>).  The current version of this package doesn't do its own garbage collection, so you are responsible for the construction and deletion of the `tmp` directory, before and after use respectively.  There is no consequence for not deleting, except wasted space.
 
    ```sh
    # before ./run.sh
