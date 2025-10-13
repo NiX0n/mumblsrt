@@ -32,8 +32,9 @@ cmake -B build \
 cmake --build build -j --config Release
 ```
 
-## Download Model
-See Whisper.cpp's [available models](https://github.com/ggml-org/whisper.cpp/blob/master/README.md#more-audio-samples).  Replace `large-v3-turbo` with your model of choice.
+## Download Model (optional)
+See Whisper.cpp's [available models](https://github.com/ggml-org/whisper.cpp/blob/master/README.md#more-audio-samples).  Replace `large-v3-turbo` with your model of choice.  By default, the stock install comes with the `ggml-base.en` model, which is useful on its own.
+
 ```sh
 ./models/download-ggml-model.sh large-v3-turbo
 ```
