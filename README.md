@@ -55,7 +55,7 @@
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About Mumblsrt</a>
+      <a href="#about-mumblsrt">About Mumblsrt</a>
       <ul>
       </ul>
     </li>
