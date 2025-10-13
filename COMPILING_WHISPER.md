@@ -55,3 +55,8 @@ ffmpeg -i "/path/to/media.avi" -f "wav" -acodec "pcm_s16le" -ac 1 -ar 16000 - \
 		-m "./models/ggml-large-v3-turbo.bin" \
 		-osrt -of "/path/to/media" -f -
 ```
+
+### Real-Time Transcription
+```sh
+./build/bin/whisper-stream -m ./models/ggml-base.en.bin -t 6 --step 500 --length 5000
+```
