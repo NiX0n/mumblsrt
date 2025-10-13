@@ -283,6 +283,20 @@ This is the `path` argument passed to the [SQLite DatabaseSync conststructor](ht
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+
+## Utility Scripts
+After running mumblsrt, you can use these utility scripts to inspect the performance.
+```sh
+# Tree/path view of attempt descendants
+node tree /path/to/media.avi
+
+# Print statistics of attempt tree
+node stats /path/to/media.avi
+```
+A well-performing trascription will have low-valued attempt counts, and average depth (mode, mean, and median).  Minimal `max_count` should be considered if the `max` depth is equal to the defined limit (default: 9).  Positive `skewness` is good; near-zero is OK, if all others metrics are low.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 <!-- ROADMAP -->
 ## Roadmap
 
