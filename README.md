@@ -132,12 +132,12 @@ These "stutterings" will repeat for long stretches of time.  Sometimes Whisper w
 The method we use to detect stutterings by calculating the average/mean count of each word (contiguous non-whitespace) over a sliding window function.  The sliding window is a contiguous range of transcriptions of variable count (1, 3, 5, and 7).  If at any of those window sizes, the average word count is greater than 2, we will consider it a stutter and will flag that range as **SUSPECT** (`is_suspect=true`).
 
 #### Zero-Length Detection
-The other less prominent failure mode presents itself as transcriptions with zero length&mdash;as in, the timestamps have zero time between them.  This is basic comparison/arithmetic to query for.  However, what is tricky is that its also accompanied by a "driftinng" behavior, where transcriptions lose syncronization with respective speech.  We're using a bit of a hacky work around, and marking the surrounding minute of transcriptions as **SUSPECT** (`is_suspect=1`).
+The other less prominent failure mode presents itself as transcriptions with zero length&mdash;as in, the timestamps have zero time between them.  This is basic comparison/arithmetic to query for.  However, what is tricky is that its also accompanied by a "driftinng" behavior, where transcriptions lose syncronization with respective speech.  We're using a bit of a hacky work around, and marking the surrounding minute (both ±) of transcriptions as **SUSPECT** (`is_suspect=1`).
 
 #### Suspect Ranges
-Once all suspect transcriptions have been marked (`is_suspect=1`), they will be fully deactivated (`is_active=0`) which will cause them to be ignored in the final output file.  Then the (notably finite) list of contiguous ranges become the definitions for subsequent recursion attempts.
+Once all suspect transcriptions have been marked (`is_suspect=1`), they will be fully deactivated (`is_active=0`) which will cause them to be ignored in the final output SRT file.  Then the (notably finite) list of contiguous ranges become the definitions for subsequent recursion attempts.  This effectively means that subsequent recursions will attempt to transcribe only between each of the suspect range's timestamps.
 
-**Notice:** If we have already hit recursion limit, we would have stopped at that depth prior to suspect transcription identification.  This is what prevents infinite recursion, and a means of always having something transcribed.
+**Notice:** If we have already hit recursion limit, we would have stopped at that depth prior to suspect transcription identification.  This is what prevents infinite recursion, and a means of always having something transcribed.  This recursion limiting also allows false-positives to eventually pass though.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -149,9 +149,9 @@ Before you can run Mumblsrt, you first have to get a few things set up.
 
 ### Prerequisites
 You will need to have the following installed and/or compiled on your system:
- * [NodeJS][NodeJS-url]
- * [ffmpeg][ffmpeg-url]
- * [Whisper.cpp][whispercpp-url]
+ * [NodeJS][NodeJS-url] v23+
+ * [ffmpeg][ffmpeg-url] v6+
+ * [Whisper.cpp][whispercpp-url] V1.7+
  
 #### NodeJS & ffmpeg
 We assume you've installed (i.e. via OS package manager, etc.) these two executables separately and that the respective executable binaries are visible via the $PATH environment variable.  If this is not the case, then some code modification may be required.
@@ -184,9 +184,9 @@ Once you have the prerequisites installed, you can proceed with using mumblsrt.
 
 Once mumblsrt is installed an configured, you run it using the following syntax:
 
-   ```sh
-   ./run.sh "/path/to/media.mp4"
-   ```
+```sh
+./run.sh "/path/to/media.mp4"
+```
 
 Using the default configuaration, this will ultimately generate a subtitle file in the same directory and filename as the input media, with a replaced extension: `.mumbl.srt`.
 
@@ -195,17 +195,18 @@ Using the default configuaration, this will ultimately generate a subtitle file 
 ## Garbage Collection
 The default configuration uses a local `tmp` working directory (see <a href="#wd">wd configuration</a>).  The current version of this package doesn't do its own garbage collection, so you are responsible for the construction and deletion of the `tmp` directory, before and after use respectively.  There is no consequence for not deleting, except wasted space.
 
-   ```sh
-   # before ./run.sh
-   mkdir tmp
+```sh
+# before ./run.sh
+mkdir tmp
 
-   # after ./run.sh
-   rm -rf tmp
-   ```
+# after ./run.sh
+rm -rf tmp
+```
+
 Notice: It may be useful to inspect the internal SQLite database for dianostic purposes before deleting your work.  For example, after transcribing, you can see more detail by running:
-   ```sh
-   sqlite3 tmp/db.sqlite3
-   ```
+```sh
+sqlite3 tmp/db.sqlite3
+```
 
 
 ## Configuration
