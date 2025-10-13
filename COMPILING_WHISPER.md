@@ -1,7 +1,7 @@
 # Compiling Whisper.cpp
 Specific to Ubuntu 24.04, as of 2025/10/01.
 
-I had problems with the 1.8.0 release.  It may be resolved by the time of reading.  After rolling back to this specific revision of Whisper.cpp was successful.
+I had problems with the 1.8.0 release.  It may be resolved by the time of reading.  After rolling back to this specific revision of Whisper.cpp, compile was successful.
 
 ## Install dependencies
 ```sh
@@ -30,4 +30,27 @@ cmake -B build \
     -DGGML_VULKAN=1 \
 	-DWHISPER_SDL2=ON
 cmake --build build -j --config Release
+```
+
+## Download Model
+See Whisper.cpp's [available models](https://github.com/ggml-org/whisper.cpp/blob/master/README.md#more-audio-samples).  Replace `large-v3-turbo` with your model of choice.
+```sh
+./models/download-ggml-model.sh large-v3-turbo
+```
+
+
+## Test
+### Compiled Binaries
+```sh
+./build/bin/whisper-cli --help
+./build/bin/whisper-stream --help
+```
+
+### Simple SRT file generation
+```sh
+ffmpeg -i "/path/to/media.avi" -f "wav" -acodec "pcm_s16le" -ac 1 -ar 16000 - \
+	| ./build/bin/whisper-cli \
+		-t 20 -bo 7 -bs 7 -nf -nth 0.2 -ml 200 \
+		-m "./models/ggml-large-v3-turbo.bin" \
+		-osrt -of "/path/to/media" -f -
 ```
