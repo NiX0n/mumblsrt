@@ -67,8 +67,10 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#garbage-collection">Garbage Collection</a></li>
     <li><a href="#configuration">Configuration</a></li>
     <li><a href="#methodology">Methodology</a></li>
+    <li><a href="#utility-scripts">Utility Scripts</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -82,7 +84,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About Mumblsrt
 
-Mumblsrt is a [NodeJS][NodeJS-url] utility for generating [SRT files][srt-url] for temporally large media using [Whisper.cpp][whispercpp-url]--which leverages OpenAI's WhisperAI models.  We're also leveraging [ffmpeg][ffmpeg-url] which allows us to generate subtitles for any of its vast supported media types (audio or video).
+Mumblsrt is a [NodeJS][NodeJS-url] utility for generating [SRT files][srt-url] for temporally large media using [Whisper.cpp][whispercpp-url]--which leverages [OpenAI's WhisperAI models](https://github.com/openai/whisper/blob/main/model-card.md).  We're also leveraging [ffmpeg][ffmpeg-url] which allows us to generate subtitles for any of its vast supported media types (audio or video).
 
 This project is perfect for transcribing:
  * VHS rips
@@ -90,8 +92,7 @@ This project is perfect for transcribing:
  * Any media that doesn't already have subtitles
  * In theory, also translating foreign languages (untested)
 
-
-Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This tool on its own can technically generate SRT files using the `-osrt` option, but _ALL_ Whisper models have a distinct hallucinatory failure mode on long stretches of audio (see <a href="#Methdology">Methdology</a> for more).
+Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This tool on its own can technically generate SRT files using the `-osrt` option, but _ALL_ Whisper models have a distinct hallucinatory failure mode on long stretches of audio (see <a href="#methdology">Methdology</a> for more).
 
 **Tip:** If you are looking to make subtitles on audio tracks less than 10 minutes or so, you're probably better off just using Whisper.cpp on its own without Mumblsrt.
 
@@ -106,7 +107,7 @@ Before you can run Mumblsrt, you first have to get a few things set up.
 You will need to have the following installed and/or compiled on your system:
  * [NodeJS][NodeJS-url] v23+
  * [ffmpeg][ffmpeg-url] v6+
- * [Whisper.cpp][whispercpp-url] V1.7+
+ * [Whisper.cpp][whispercpp-url] v1.7+
  
 #### NodeJS & ffmpeg
 We assume you've installed (i.e. via OS package manager, etc.) these two executables separately and that the respective executable binaries are visible via the $PATH environment variable.  If this is not the case, then some code modification may be required.
@@ -283,14 +284,23 @@ Once all suspect transcriptions have been marked (`is_suspect=1`), they will be 
 
 ## Utility Scripts
 After running mumblsrt, you can use these utility scripts to inspect the performance.
+### Tree
+Prints a tree/path view of attempt descendants.  Useful for visualizing the overall tree of attempts.
 ```sh
-# Tree/path view of attempt descendants
 node tree /path/to/media.avi
+```
+**Notice:* `/path/to/media.avi` must be the same path used in ./run.sh, as the filename is the index used in the database.
 
-# Print statistics of attempt tree
+### Stats
+Print statistics of attempt tree and related transcriptions.
+```sh
 node stats /path/to/media.avi
 ```
-A well-performing trascription will have low-valued attempt counts, and average depth (mode, mean, and median).  Minimal `max_count` should be considered if the `max` depth is equal to the defined limit (default: 9).  Positive `skewness` is good; near-zero is OK, if all others metrics are low.
+A well-performing trascription will have low-valued attempt counts, and average depth (mode, mean, and median).  Minimal `max_count` should be considered if the `max` depth is equal to the defined limit (default: 9).  When the max is below the limit, this is also a good sign.  Positive `skewness` is good; near-zero is OK, if all others metrics are low.
+
+From a statistics perspective, for recursion depths, what we want is a postively skewed, if not a tight, distribution with averages as close to 1 as possible.
+
+The `suspect_rate` is a value between 0-1, which is the representation of susept transcriptions compared to the overall number of transcriptions generated.  A high `suspect_rate` may be indicative of uderlying issues with the media, but not necessarily with the final subtitle output.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
