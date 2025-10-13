@@ -92,7 +92,7 @@ This project is perfect for transcribing:
  * Any media that doesn't already have subtitles
  * In theory, also translating foreign languages (untested)
 
-Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This tool on its own can technically generate SRT files using the `-osrt` option, but _ALL_ Whisper models have a distinct hallucinatory failure mode on long stretches of audio (see <a href="#methdology">Methdology</a> for more).
+Specifically, we're leveraging Whisper.cpp's Command Line Interface (CLI).  This tool on its own can technically generate SRT files using the `-osrt` option, but _ALL_ Whisper models have a distinct hallucinatory failure mode on long stretches of audio (see <a href="#methodology">Methdology</a> for more).
 
 **Tip:** If you are looking to make subtitles on audio tracks less than 10 minutes or so, you're probably better off just using Whisper.cpp on its own without Mumblsrt.
 
